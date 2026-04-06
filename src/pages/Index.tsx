@@ -1,6 +1,5 @@
 import Navbar from "@/components/Navbar";
-import HeroSection from "@/components/HeroSection";
-import GardenSection from "@/components/GardenSection";
+import ScrollJourney from "@/components/ScrollJourney";
 import ProductsSection from "@/components/ProductsSection";
 import BrandStory from "@/components/BrandStory";
 import Footer from "@/components/Footer";
@@ -9,8 +8,7 @@ const Index = () => {
   return (
     <div className="bg-background">
       <Navbar />
-      <HeroSection />
-      <GardenSection />
+      <ScrollJourney />
       <ProductsSection />
       <BrandStory />
       <Footer />
