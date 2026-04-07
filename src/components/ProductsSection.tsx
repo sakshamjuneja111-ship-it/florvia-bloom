@@ -4,7 +4,6 @@ import product1 from "@/assets/product-1.jpg";
 import product2 from "@/assets/product-2.jpg";
 import product3 from "@/assets/product-3.jpg";
 import product4 from "@/assets/product-4.jpg";
-import productsHero from "@/assets/products-hero.jpg";
 
 const products = [
   { img: product1, name: "Herbal Vitality Blend", price: "$38", tag: "Bestseller", desc: "Premium organic supplement for daily energy" },
@@ -18,56 +17,46 @@ const ease = [0.16, 1, 0.3, 1] as const;
 const ProductsSection = () => {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
-  const heroRef = useRef<HTMLDivElement>(null);
-  const heroInView = useInView(heroRef, { once: true });
 
   return (
     <section id="products" className="relative bg-background overflow-hidden">
-      {/* Intro text after gate */}
-      <div className="py-32 md:py-44 text-center px-6">
+      {/* Soft atmospheric entry — continues the bloom from the gate */}
+      <div className="absolute top-0 left-0 right-0 h-64 pointer-events-none" style={{
+        background: "linear-gradient(to bottom, hsl(var(--cream)) 0%, hsl(var(--background)) 100%)"
+      }} />
+      <div className="absolute top-0 left-0 right-0 h-96 pointer-events-none opacity-30" style={{
+        background: "radial-gradient(ellipse at 50% 0%, hsla(38, 50%, 70%, 0.4) 0%, transparent 60%)"
+      }} />
+
+      {/* Intro */}
+      <div className="pt-40 pb-20 md:pt-52 md:pb-28 text-center px-6 relative">
         <motion.p
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease }}
           viewport={{ once: true }}
-          className="font-body text-xs tracking-[0.4em] uppercase text-muted-foreground mb-6"
+          className="font-body text-xs tracking-[0.4em] uppercase text-muted-foreground/70 mb-5"
         >
           Welcome to Florvia
         </motion.p>
         <motion.h2
-          initial={{ opacity: 0, y: 40 }}
+          initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, ease, delay: 0.15 }}
+          transition={{ duration: 1.2, ease, delay: 0.1 }}
           viewport={{ once: true }}
-          className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-foreground leading-tight"
+          className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight"
         >
           Harvested for <span className="italic font-light text-forest-light">You</span>
         </motion.h2>
         <motion.p
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1, ease, delay: 0.3 }}
+          transition={{ duration: 1, ease, delay: 0.2 }}
           viewport={{ once: true }}
-          className="font-body text-muted-foreground mt-6 text-lg max-w-lg mx-auto"
+          className="font-body text-muted-foreground mt-5 text-base max-w-md mx-auto leading-relaxed"
         >
           From our botanical garden to your wellness routine — pure, potent, and organic.
         </motion.p>
-      </div>
-
-      {/* Products hero banner */}
-      <div ref={heroRef} className="relative h-[60vh] overflow-hidden mx-6 md:mx-12 rounded-2xl mb-24">
-        <motion.img
-          initial={{ scale: 1.15 }}
-          animate={heroInView ? { scale: 1 } : {}}
-          transition={{ duration: 2, ease }}
-          src={productsHero}
-          alt="Florvia organic wellness products"
-          className="w-full h-full object-cover"
-          loading="lazy"
-          width={1920}
-          height={1080}
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
       </div>
 
       {/* Product grid */}
@@ -76,12 +65,12 @@ const ProductsSection = () => {
           {products.map((product, i) => (
             <motion.div
               key={product.name}
-              initial={{ opacity: 0, y: 50 }}
+              initial={{ opacity: 0, y: 40 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.9, ease, delay: i * 0.12 }}
+              transition={{ duration: 0.9, ease, delay: i * 0.1 }}
               className="group cursor-pointer"
             >
-              <div className="relative rounded-xl overflow-hidden aspect-square mb-5 bg-card">
+              <div className="relative rounded-xl overflow-hidden aspect-square mb-5 bg-cream-dark/30">
                 <img
                   src={product.img}
                   alt={product.name}
@@ -107,7 +96,7 @@ const ProductsSection = () => {
         </div>
 
         <motion.div
-          initial={{ opacity: 0, y: 25 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease }}
           viewport={{ once: true }}
@@ -115,7 +104,7 @@ const ProductsSection = () => {
         >
           <a
             href="#"
-            className="inline-block border border-primary text-primary px-12 py-4 rounded-full font-body font-medium tracking-[0.15em] text-sm uppercase hover:bg-primary hover:text-primary-foreground transition-all duration-500"
+            className="inline-block border border-primary/60 text-primary px-12 py-4 rounded-full font-body font-medium tracking-[0.15em] text-sm uppercase hover:bg-primary hover:text-primary-foreground transition-all duration-500"
           >
             Explore All Products
           </a>
