@@ -1,9 +1,13 @@
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
+import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
 import product1 from "@/assets/product-1.jpg";
 import product2 from "@/assets/product-2.jpg";
 import product3 from "@/assets/product-3.jpg";
 import product4 from "@/assets/product-4.jpg";
+
+gsap.registerPlugin(ScrollTrigger);
 
 const products = [
   { img: product1, name: "Herbal Vitality Blend", price: "$38", tag: "Bestseller", desc: "Premium organic supplement for daily energy" },
@@ -14,12 +18,124 @@ const products = [
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
-const ProductsSection = () => {
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: "-80px" });
+const ProductCard = ({ product, index }: { product: typeof products[0]; index: number }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  // GSAP magnetic hover effect
+  useEffect(() => {
+    const card = cardRef.current;
+    if (!card) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = card.getBoundingClientRect();
+      const x = (e.clientX - rect.left - rect.width / 2) / rect.width;
+      const y = (e.clientY - rect.top - rect.height / 2) / rect.height;
+
+      gsap.to(card, {
+        rotateY: x * 8,
+        rotateX: -y * 8,
+        transformPerspective: 800,
+        duration: 0.4,
+        ease: "power2.out",
+      });
+
+      if (imgRef.current) {
+        gsap.to(imgRef.current, {
+          scale: 1.06,
+          x: x * 8,
+          y: y * 8,
+          duration: 0.6,
+          ease: "power2.out",
+        });
+      }
+    };
+
+    const handleMouseLeave = () => {
+      gsap.to(card, {
+        rotateY: 0,
+        rotateX: 0,
+        duration: 0.6,
+        ease: "elastic.out(1, 0.5)",
+      });
+      if (imgRef.current) {
+        gsap.to(imgRef.current, {
+          scale: 1,
+          x: 0,
+          y: 0,
+          duration: 0.6,
+          ease: "power2.out",
+        });
+      }
+    };
+
+    card.addEventListener("mousemove", handleMouseMove);
+    card.addEventListener("mouseleave", handleMouseLeave);
+    return () => {
+      card.removeEventListener("mousemove", handleMouseMove);
+      card.removeEventListener("mouseleave", handleMouseLeave);
+    };
+  }, []);
 
   return (
-    <section id="products" className="relative bg-background overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, y: 50 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.9, ease, delay: index * 0.12 }}
+      viewport={{ once: true, margin: "-60px" }}
+      className="group cursor-pointer"
+    >
+      <div
+        ref={cardRef}
+        className="relative rounded-2xl overflow-hidden aspect-square mb-5"
+        style={{
+          background: "linear-gradient(135deg, hsl(var(--cream-dark) / 0.3), hsl(var(--card)))",
+          boxShadow: "0 8px 32px hsla(150, 30%, 12%, 0.08), 0 2px 8px hsla(150, 30%, 12%, 0.04)",
+          transformStyle: "preserve-3d",
+        }}
+      >
+        <img
+          ref={imgRef}
+          src={product.img}
+          alt={product.name}
+          className="w-full h-full object-cover"
+          loading="lazy"
+          width={800}
+          height={800}
+          style={{ willChange: "transform" }}
+        />
+        <div className="absolute top-4 left-4 z-10">
+          <span
+            className="px-3.5 py-1 rounded-full text-[10px] font-body font-medium tracking-[0.1em] uppercase"
+            style={{
+              background: "hsl(var(--primary) / 0.9)",
+              color: "hsl(var(--primary-foreground))",
+              backdropFilter: "blur(8px)",
+            }}
+          >
+            {product.tag}
+          </span>
+        </div>
+        {/* Hover shimmer overlay */}
+        <div
+          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
+          style={{
+            background: "linear-gradient(135deg, hsla(38, 50%, 70%, 0.08) 0%, transparent 50%, hsla(38, 50%, 70%, 0.05) 100%)",
+          }}
+        />
+      </div>
+      <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-forest-light transition-colors duration-500">
+        {product.name}
+      </h3>
+      <p className="font-body text-sm text-muted-foreground mt-1.5 leading-relaxed">{product.desc}</p>
+      <p className="font-body text-lg font-semibold text-accent mt-3">{product.price}</p>
+    </motion.div>
+  );
+};
+
+const ProductsSection = () => {
+  return (
+    <section id="products" className="relative overflow-hidden" style={{ background: "hsl(var(--background))" }}>
       {/* Soft atmospheric entry — continues the bloom from the gate */}
       <div className="absolute top-0 left-0 right-0 h-64 pointer-events-none" style={{
         background: "linear-gradient(to bottom, hsl(var(--cream)) 0%, hsl(var(--background)) 100%)"
@@ -60,38 +176,10 @@ const ProductsSection = () => {
       </div>
 
       {/* Product grid */}
-      <div ref={ref} className="container mx-auto px-6 pb-32">
+      <div className="container mx-auto px-6 pb-32">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
           {products.map((product, i) => (
-            <motion.div
-              key={product.name}
-              initial={{ opacity: 0, y: 40 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.9, ease, delay: i * 0.1 }}
-              className="group cursor-pointer"
-            >
-              <div className="relative rounded-xl overflow-hidden aspect-square mb-5 bg-cream-dark/30">
-                <img
-                  src={product.img}
-                  alt={product.name}
-                  className="w-full h-full object-cover transition-transform duration-[1.2s] ease-out group-hover:scale-105"
-                  loading="lazy"
-                  width={800}
-                  height={800}
-                />
-                <div className="absolute top-4 left-4">
-                  <span className="bg-primary/90 text-primary-foreground px-3.5 py-1 rounded-full text-[10px] font-body font-medium tracking-[0.1em] uppercase">
-                    {product.tag}
-                  </span>
-                </div>
-                <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/5 transition-colors duration-700" />
-              </div>
-              <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-forest-light transition-colors duration-500">
-                {product.name}
-              </h3>
-              <p className="font-body text-sm text-muted-foreground mt-1.5 leading-relaxed">{product.desc}</p>
-              <p className="font-body text-lg font-semibold text-accent mt-3">{product.price}</p>
-            </motion.div>
+            <ProductCard key={product.name} product={product} index={i} />
           ))}
         </div>
 
@@ -104,7 +192,27 @@ const ProductsSection = () => {
         >
           <a
             href="#"
-            className="inline-block border border-primary/60 text-primary px-12 py-4 rounded-full font-body font-medium tracking-[0.15em] text-sm uppercase hover:bg-primary hover:text-primary-foreground transition-all duration-500"
+            className="inline-block border px-12 py-4 rounded-full font-body font-medium tracking-[0.15em] text-sm uppercase transition-all duration-500 hover:shadow-lg"
+            style={{
+              borderColor: "hsl(var(--primary) / 0.4)",
+              color: "hsl(var(--primary))",
+            }}
+            onMouseEnter={(e) => {
+              gsap.to(e.currentTarget, {
+                background: "hsl(var(--primary))",
+                color: "hsl(var(--primary-foreground))",
+                duration: 0.4,
+                ease: "power2.out",
+              });
+            }}
+            onMouseLeave={(e) => {
+              gsap.to(e.currentTarget, {
+                background: "transparent",
+                color: "hsl(var(--primary))",
+                duration: 0.4,
+                ease: "power2.out",
+              });
+            }}
           >
             Explore All Products
           </a>
