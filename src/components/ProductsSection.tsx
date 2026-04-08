@@ -198,17 +198,22 @@ const ProductsSection = () => {
               color: "hsl(var(--primary))",
             }}
             onMouseEnter={(e) => {
-              gsap.to(e.currentTarget, {
-                background: "hsl(var(--primary))",
-                color: "hsl(var(--primary-foreground))",
+              const el = e.currentTarget;
+              const primary = getComputedStyle(el).getPropertyValue('--primary').trim();
+              const primaryFg = getComputedStyle(el).getPropertyValue('--primary-foreground').trim();
+              gsap.to(el, {
+                backgroundColor: `hsl(${primary})`,
+                color: `hsl(${primaryFg})`,
                 duration: 0.4,
                 ease: "power2.out",
               });
             }}
             onMouseLeave={(e) => {
-              gsap.to(e.currentTarget, {
-                background: "transparent",
-                color: "hsl(var(--primary))",
+              const el = e.currentTarget;
+              const primary = getComputedStyle(el).getPropertyValue('--primary').trim();
+              gsap.to(el, {
+                backgroundColor: "transparent",
+                color: `hsl(${primary})`,
                 duration: 0.4,
                 ease: "power2.out",
               });
