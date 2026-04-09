@@ -336,16 +336,46 @@ const ScrollJourney = () => {
           </div>
         </motion.div>
 
-        {/* Coming Soon overlay */}
+        {/* Coming Soon overlay with waitlist */}
         <motion.div style={{ opacity: cs_to, y: cs_ty, zIndex: 21, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
-          <div>
-            <div className="w-12 h-[1px] bg-cream/20 mx-auto mb-6" />
-            <p className="font-body text-xs md:text-sm tracking-[0.5em] uppercase text-cream/60 mb-3">Coming Soon</p>
-            <h2 className="font-display text-2xl md:text-4xl lg:text-5xl font-bold text-cream leading-tight drop-shadow-lg">
+          <div className="max-w-lg w-full">
+            <div className="w-16 h-[1px] bg-cream/20 mx-auto mb-8" />
+            <p className="font-body text-sm md:text-base tracking-[0.5em] uppercase text-cream/60 mb-4">Coming Soon</p>
+            <h2 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-cream leading-tight drop-shadow-lg mb-4">
               Something <span className="italic font-light">Beautiful</span>
             </h2>
-            <p className="font-body text-cream/40 text-sm mt-4 max-w-sm mx-auto">Our botanical wellness collection is being crafted with care.</p>
-            <div className="w-12 h-[1px] bg-cream/20 mx-auto mt-6" />
+            <p className="font-body text-cream/50 text-base md:text-lg mt-4 max-w-md mx-auto leading-relaxed">Our botanical wellness collection is being crafted with care.</p>
+            
+            {/* Waitlist signup */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const form = e.target as HTMLFormElement;
+                const email = (form.elements.namedItem('email') as HTMLInputElement).value;
+                if (email) {
+                  form.reset();
+                  const btn = form.querySelector('button');
+                  if (btn) { btn.textContent = 'You\'re on the list ✓'; setTimeout(() => { btn.textContent = 'Join the Waitlist'; }, 3000); }
+                }
+              }}
+              className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto"
+            >
+              <input
+                name="email"
+                type="email"
+                required
+                placeholder="Enter your email"
+                className="w-full sm:flex-1 px-5 py-3.5 rounded-full bg-cream/10 backdrop-blur-md border border-cream/15 text-cream placeholder:text-cream/30 font-body text-base focus:outline-none focus:border-cream/40 focus:ring-1 focus:ring-cream/20 transition-all duration-300"
+              />
+              <button
+                type="submit"
+                className="w-full sm:w-auto px-8 py-3.5 rounded-full bg-cream/15 backdrop-blur-md border border-cream/20 text-cream font-body text-base tracking-wider uppercase hover:bg-cream/25 hover:border-cream/35 transition-all duration-500 whitespace-nowrap"
+              >
+                Join the Waitlist
+              </button>
+            </form>
+            
+            <div className="w-16 h-[1px] bg-cream/20 mx-auto mt-10" />
           </div>
         </motion.div>
 
