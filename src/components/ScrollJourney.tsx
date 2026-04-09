@@ -338,13 +338,31 @@ const ScrollJourney = () => {
 
         {/* Coming Soon overlay with waitlist */}
         <motion.div style={{ opacity: cs_to, y: cs_ty, zIndex: 21, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
-          <div className="max-w-lg w-full">
-            <div className="w-16 h-[1px] bg-cream/20 mx-auto mb-8" />
-            <p className="font-body text-sm md:text-base tracking-[0.5em] uppercase text-cream/60 mb-4">Coming Soon</p>
-            <h2 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold text-cream leading-tight drop-shadow-lg mb-4">
+          <div className="max-w-lg w-full" ref={(el) => {
+            if (!el) return;
+            const items = el.querySelectorAll('.waitlist-stagger');
+            if (items.length === 0) return;
+            gsap.fromTo(items,
+              { opacity: 0, y: 24, scale: 0.97 },
+              {
+                opacity: 1, y: 0, scale: 1,
+                duration: 0.9,
+                stagger: 0.15,
+                ease: "power3.out",
+                scrollTrigger: {
+                  trigger: el,
+                  start: "top 80%",
+                  toggleActions: "play none none none",
+                },
+              }
+            );
+          }}>
+            <div className="waitlist-stagger w-16 h-[1px] bg-cream/20 mx-auto mb-8" />
+            <p className="waitlist-stagger font-body text-sm md:text-base tracking-[0.5em] uppercase text-cream/60 mb-4">Coming Soon</p>
+            <h2 className="waitlist-stagger font-display text-4xl md:text-6xl lg:text-7xl font-bold text-cream leading-tight drop-shadow-lg mb-4">
               Something <span className="italic font-light">Beautiful</span>
             </h2>
-            <p className="font-body text-cream/50 text-base md:text-lg mt-4 max-w-md mx-auto leading-relaxed">Our botanical wellness collection is being crafted with care.</p>
+            <p className="waitlist-stagger font-body text-cream/50 text-base md:text-lg mt-4 max-w-md mx-auto leading-relaxed">Our botanical wellness collection is being crafted with care.</p>
             
             {/* Waitlist signup */}
             <form
@@ -358,7 +376,7 @@ const ScrollJourney = () => {
                   if (btn) { btn.textContent = 'You\'re on the list ✓'; setTimeout(() => { btn.textContent = 'Join the Waitlist'; }, 3000); }
                 }
               }}
-              className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto"
+              className="waitlist-stagger mt-10 flex flex-col sm:flex-row items-center justify-center gap-3 max-w-md mx-auto"
             >
               <input
                 name="email"
@@ -375,7 +393,7 @@ const ScrollJourney = () => {
               </button>
             </form>
             
-            <div className="w-16 h-[1px] bg-cream/20 mx-auto mt-10" />
+            <div className="waitlist-stagger w-16 h-[1px] bg-cream/20 mx-auto mt-10" />
           </div>
         </motion.div>
 
