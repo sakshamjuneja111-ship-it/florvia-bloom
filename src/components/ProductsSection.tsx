@@ -1,13 +1,10 @@
 import { useRef, useEffect } from "react";
-import { motion, useInView } from "framer-motion";
+import { motion } from "framer-motion";
 import gsap from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
 import product1 from "@/assets/product-1.jpg";
 import product2 from "@/assets/product-2.jpg";
 import product3 from "@/assets/product-3.jpg";
 import product4 from "@/assets/product-4.jpg";
-
-gsap.registerPlugin(ScrollTrigger);
 
 const products = [
   { img: product1, name: "Herbal Vitality Blend", price: "$38", tag: "Bestseller", desc: "Premium organic supplement for daily energy" },
@@ -22,7 +19,6 @@ const ProductCard = ({ product, index }: { product: typeof products[0]; index: n
   const cardRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
 
-  // GSAP magnetic hover effect
   useEffect(() => {
     const card = cardRef.current;
     if (!card) return;
@@ -59,13 +55,7 @@ const ProductCard = ({ product, index }: { product: typeof products[0]; index: n
         ease: "elastic.out(1, 0.5)",
       });
       if (imgRef.current) {
-        gsap.to(imgRef.current, {
-          scale: 1,
-          x: 0,
-          y: 0,
-          duration: 0.6,
-          ease: "power2.out",
-        });
+        gsap.to(imgRef.current, { scale: 1, x: 0, y: 0, duration: 0.6, ease: "power2.out" });
       }
     };
 
@@ -106,17 +96,17 @@ const ProductCard = ({ product, index }: { product: typeof products[0]; index: n
         />
         <div className="absolute top-4 left-4 z-10">
           <span
-            className="px-3.5 py-1 rounded-full text-[10px] font-body font-medium tracking-[0.1em] uppercase"
+            className="px-3.5 py-1 rounded-full font-body font-light tracking-[0.1em] uppercase"
             style={{
               background: "hsl(var(--primary) / 0.9)",
               color: "hsl(var(--primary-foreground))",
               backdropFilter: "blur(8px)",
+              fontSize: "10px",
             }}
           >
             {product.tag}
           </span>
         </div>
-        {/* Hover shimmer overlay */}
         <div
           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-700"
           style={{
@@ -124,19 +114,52 @@ const ProductCard = ({ product, index }: { product: typeof products[0]; index: n
           }}
         />
       </div>
-      <h3 className="font-display text-lg font-semibold text-foreground group-hover:text-forest-light transition-colors duration-500">
+      <h3 className="font-display text-xl font-light text-foreground group-hover:text-forest-light transition-colors duration-500">
         {product.name}
       </h3>
-      <p className="font-body text-sm text-muted-foreground mt-1.5 leading-relaxed">{product.desc}</p>
-      <p className="font-body text-lg font-semibold text-accent mt-3">{product.price}</p>
+      <p className="font-body text-xs text-muted-foreground/70 mt-1 leading-relaxed tracking-wide">{product.desc}</p>
+      <p className="font-body text-sm font-light tracking-widest text-accent mt-3">{product.price}</p>
     </motion.div>
   );
 };
 
 const ProductsSection = () => {
+  const btnRef = useRef<HTMLAnchorElement>(null);
+
+  useEffect(() => {
+    const el = btnRef.current;
+    if (!el) return;
+
+    const computedStyle = getComputedStyle(el);
+    const resolveVar = (name: string) => computedStyle.getPropertyValue(name).trim();
+
+    const onEnter = () => {
+      gsap.to(el, {
+        backgroundColor: `hsl(${resolveVar('--primary')})`,
+        color: `hsl(${resolveVar('--primary-foreground')})`,
+        duration: 0.4,
+        ease: "power2.out",
+      });
+    };
+    const onLeave = () => {
+      gsap.to(el, {
+        backgroundColor: "transparent",
+        color: `hsl(${resolveVar('--primary')})`,
+        duration: 0.4,
+        ease: "power2.out",
+      });
+    };
+
+    el.addEventListener("mouseenter", onEnter);
+    el.addEventListener("mouseleave", onLeave);
+    return () => {
+      el.removeEventListener("mouseenter", onEnter);
+      el.removeEventListener("mouseleave", onLeave);
+    };
+  }, []);
+
   return (
     <section id="products" className="relative overflow-hidden" style={{ background: "hsl(var(--background))" }}>
-      {/* Soft atmospheric entry — continues the bloom from the gate */}
       <div className="absolute top-0 left-0 right-0 h-64 pointer-events-none" style={{
         background: "linear-gradient(to bottom, hsl(var(--cream)) 0%, hsl(var(--background)) 100%)"
       }} />
@@ -144,14 +167,13 @@ const ProductsSection = () => {
         background: "radial-gradient(ellipse at 50% 0%, hsla(38, 50%, 70%, 0.4) 0%, transparent 60%)"
       }} />
 
-      {/* Intro */}
       <div className="pt-40 pb-20 md:pt-52 md:pb-28 text-center px-6 relative">
         <motion.p
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease }}
           viewport={{ once: true }}
-          className="font-body text-xs tracking-[0.4em] uppercase text-muted-foreground/70 mb-5"
+          className="font-body text-[10px] tracking-[0.45em] font-light uppercase text-muted-foreground/50 mb-5"
         >
           Welcome to Florvia
         </motion.p>
@@ -160,22 +182,21 @@ const ProductsSection = () => {
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1.2, ease, delay: 0.1 }}
           viewport={{ once: true }}
-          className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground leading-tight"
+          className="font-display text-5xl md:text-6xl lg:text-7xl font-light text-foreground leading-tight"
         >
-          Harvested for <span className="italic font-light text-forest-light">You</span>
+          Harvested for <span className="italic font-extralight text-forest-light">You</span>
         </motion.h2>
         <motion.p
           initial={{ opacity: 0, y: 15 }}
           whileInView={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, ease, delay: 0.2 }}
           viewport={{ once: true }}
-          className="font-body text-muted-foreground mt-5 text-base max-w-md mx-auto leading-relaxed"
+          className="font-body text-muted-foreground/50 mt-5 text-base max-w-md mx-auto leading-relaxed tracking-wide"
         >
           From our botanical garden to your wellness routine — pure, potent, and organic.
         </motion.p>
       </div>
 
-      {/* Product grid */}
       <div className="container mx-auto px-6 pb-32">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-10">
           {products.map((product, i) => (
@@ -191,32 +212,12 @@ const ProductsSection = () => {
           className="text-center mt-20"
         >
           <a
-            href="#"
-            className="inline-block border px-12 py-4 rounded-full font-body font-medium tracking-[0.15em] text-sm uppercase transition-all duration-500 hover:shadow-lg"
+            ref={btnRef}
+            href="#products"
+            className="inline-block border px-12 py-4 rounded-full font-body font-light tracking-[0.15em] text-sm uppercase transition-all duration-500 hover:shadow-lg cursor-pointer"
             style={{
               borderColor: "hsl(var(--primary) / 0.4)",
               color: "hsl(var(--primary))",
-            }}
-            onMouseEnter={(e) => {
-              const el = e.currentTarget;
-              const primary = getComputedStyle(el).getPropertyValue('--primary').trim();
-              const primaryFg = getComputedStyle(el).getPropertyValue('--primary-foreground').trim();
-              gsap.to(el, {
-                backgroundColor: `hsl(${primary})`,
-                color: `hsl(${primaryFg})`,
-                duration: 0.4,
-                ease: "power2.out",
-              });
-            }}
-            onMouseLeave={(e) => {
-              const el = e.currentTarget;
-              const primary = getComputedStyle(el).getPropertyValue('--primary').trim();
-              gsap.to(el, {
-                backgroundColor: "transparent",
-                color: `hsl(${primary})`,
-                duration: 0.4,
-                ease: "power2.out",
-              });
             }}
           >
             Explore All Products

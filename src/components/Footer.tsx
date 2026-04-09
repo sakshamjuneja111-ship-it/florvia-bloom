@@ -6,14 +6,14 @@ const Footer = () => {
       <div className="container mx-auto px-6 pt-24 pb-16">
         <div className="grid md:grid-cols-4 gap-12 mb-12">
           <div className="md:col-span-2">
-            <h3 className="font-display text-2xl font-bold text-primary-foreground mb-4">FLORVIA</h3>
+            <h3 className="font-display text-2xl font-light text-primary-foreground mb-4" style={{ letterSpacing: "0.3em" }}>FLORVIA</h3>
             <p className="font-body text-primary-foreground/60 max-w-sm leading-relaxed text-sm">
               Organic health & wellness, crafted from nature's finest botanicals. 
               From our garden to your wellness routine.
             </p>
           </div>
           <div>
-            <h4 className="font-body text-xs font-semibold tracking-[0.2em] uppercase text-primary-foreground/80 mb-4">Shop</h4>
+            <h4 className="font-body text-[10px] tracking-[0.25em] font-light uppercase text-primary-foreground/80 mb-4">Shop</h4>
             <ul className="space-y-3">
               {["All Products", "Supplements", "Teas", "Skincare"].map((item) => (
                 <li key={item}>
@@ -25,7 +25,7 @@ const Footer = () => {
             </ul>
           </div>
           <div>
-            <h4 className="font-body text-xs font-semibold tracking-[0.2em] uppercase text-primary-foreground/80 mb-4">Company</h4>
+            <h4 className="font-body text-[10px] tracking-[0.25em] font-light uppercase text-primary-foreground/80 mb-4">Company</h4>
             <ul className="space-y-3">
               {["Our Story", "Garden", "Sustainability", "Contact"].map((item) => (
                 <li key={item}>
@@ -39,7 +39,7 @@ const Footer = () => {
         </div>
         <div className="border-t border-primary-foreground/10 pt-8 text-center">
           <p className="font-body text-primary-foreground/40 text-xs tracking-wider">
-            © 2026 Florvia. All rights reserved.
+            © {new Date().getFullYear()} Florvia. All rights reserved.
           </p>
         </div>
       </div>

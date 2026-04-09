@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
+/* Fonts loaded via index.html preconnect */
 
 @tailwind base;
 @tailwind components;
@@ -50,8 +50,8 @@
     --gradient-garden: linear-gradient(180deg, hsla(100, 30%, 55%, 0.15) 0%, hsla(40, 33%, 95%, 0.9) 100%);
     --gradient-gold: linear-gradient(135deg, hsl(38, 50%, 55%), hsl(38, 45%, 70%));
 
-    --font-display: 'Playfair Display', serif;
-    --font-body: 'Inter', sans-serif;
+    --font-display: 'Cormorant Garamond', serif;
+    --font-body: 'DM Sans', sans-serif;
 
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
