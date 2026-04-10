@@ -1,10 +1,11 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import { motion, useScroll, useTransform, useSpring, MotionValue, AnimatePresence } from "framer-motion";
 import gsap from "gsap";
 import mountainsHero from "@/assets/mountains-hero.jpg";
 import mountainToGarden from "@/assets/mountain-to-garden.jpg";
 import gardenPathway from "@/assets/garden-pathway.jpg";
 import gardenGate from "@/assets/garden-gate.jpg";
+import GoldenDust from "@/components/GoldenDust";
 
 /* ─── FIX 9: Heavy cinematic spring ─── */
 const SPRING = { stiffness: 18, damping: 50, restDelta: 0.0003 };
@@ -50,6 +51,190 @@ const TextBackdrop = () => (
   />
 );
 
+/* ─── FIX 18: Foreground foliage parallax ─── */
+const FoliageLayer = ({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
+  const leftY = useTransform(scrollProgress, [0, 1], [0, -600]);
+  const rightY = useTransform(scrollProgress, [0, 1], [0, -500]);
+  const foliageOpacity = useTransform(scrollProgress, [0, 0.15, 0.5, 0.7], [0.6, 0.8, 0.5, 0]);
+
+  return (
+    <>
+      <motion.div
+        style={{ y: leftY, opacity: foliageOpacity, zIndex: 11, ...GPU }}
+        className="absolute left-0 top-[20%] pointer-events-none"
+      >
+        <svg width="120" height="300" viewBox="0 0 120 300" fill="none" opacity="0.4">
+          <path d="M80 0 Q20 80 60 160 Q30 200 50 280 Q70 220 90 160 Q120 80 80 0Z" fill="hsl(var(--forest))" />
+          <path d="M40 40 Q10 120 30 200 Q50 140 40 40Z" fill="hsl(var(--forest-light))" opacity="0.5" />
+        </svg>
+      </motion.div>
+      <motion.div
+        style={{ y: rightY, opacity: foliageOpacity, zIndex: 11, ...GPU }}
+        className="absolute right-0 top-[30%] pointer-events-none"
+      >
+        <svg width="100" height="260" viewBox="0 0 100 260" fill="none" opacity="0.35">
+          <path d="M20 0 Q80 60 40 140 Q70 180 50 260 Q30 200 10 140 Q-20 60 20 0Z" fill="hsl(var(--forest))" />
+        </svg>
+      </motion.div>
+    </>
+  );
+};
+
+/* ─── FIX 18: Morphing F monogram (seed → ornate) ─── */
+const MorphingMonogram = ({ progress }: { progress: MotionValue<number> }) => {
+  const morph = useTransform(progress, [0.75, 0.85], [0, 1]);
+  const morphOpacity = useTransform(progress, [0.60, 0.68], [0, 0.45]);
+
+  return (
+    <motion.svg
+      width="80" height="80" viewBox="0 0 100 100"
+      style={{ opacity: morphOpacity }}
+      className="mx-auto mb-6"
+    >
+      <motion.path
+        style={{
+          pathLength: morph,
+        }}
+        d="M30 85 L30 25 Q30 15 40 15 L70 15 M30 48 L58 48"
+        fill="none"
+        stroke="hsl(var(--gold))"
+        strokeWidth="0.8"
+        strokeLinecap="round"
+      />
+      <motion.path
+        style={{ pathLength: morph }}
+        d="M62 15 Q72 8 75 18 Q68 14 62 15Z"
+        fill="none"
+        stroke="hsl(var(--gold))"
+        strokeWidth="0.6"
+      />
+      <motion.path
+        style={{ pathLength: morph }}
+        d="M52 48 Q62 38 68 45 Q58 42 52 48Z"
+        fill="none"
+        stroke="hsl(var(--gold))"
+        strokeWidth="0.6"
+      />
+    </motion.svg>
+  );
+};
+
+/* ─── FIX 19: Progressive word reveal ─── */
+const ProgressiveHeading = ({
+  words,
+  className,
+  style,
+  triggerProgress,
+  scrollProgress,
+}: {
+  words: string[];
+  className?: string;
+  style?: React.CSSProperties;
+  triggerProgress: [number, number];
+  scrollProgress: MotionValue<number>;
+}) => {
+  const [revealed, setRevealed] = useState<boolean[]>(words.map(() => false));
+
+  useEffect(() => {
+    const unsub = scrollProgress.on("change", (v) => {
+      const [start, end] = triggerProgress;
+      const range = end - start;
+      const newRevealed = words.map((_, i) => {
+        const wordTrigger = start + (range * i) / words.length;
+        return v >= wordTrigger;
+      });
+      setRevealed(newRevealed);
+    });
+    return unsub;
+  }, [scrollProgress, triggerProgress, words.length]);
+
+  return (
+    <span className={className} style={style}>
+      {words.map((word, i) => (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0 }}
+          animate={revealed[i] ? { opacity: 1 } : { opacity: 0 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          style={{
+            display: "inline-block",
+            marginRight: "0.3em",
+            textShadow: revealed[i]
+              ? `${HEADING_SHADOW}, 0 0 40px hsl(var(--gold) / 0.3)`
+              : HEADING_SHADOW,
+          }}
+        >
+          {word}
+        </motion.span>
+      ))}
+    </span>
+  );
+};
+
+/* ─── FIX 15: Pulsing label component ─── */
+const PulsingLabel = ({ text }: { text: string }) => (
+  <motion.span
+    animate={{
+      textShadow: [
+        "0 0 8px hsl(var(--gold) / 0.3), 0 0 20px hsl(var(--gold) / 0.15)",
+        "0 0 16px hsl(var(--gold) / 0.6), 0 0 40px hsl(var(--gold) / 0.3)",
+        "0 0 8px hsl(var(--gold) / 0.3), 0 0 20px hsl(var(--gold) / 0.15)",
+      ],
+    }}
+    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+    className="font-body font-medium text-[13px] tracking-wider"
+    style={{ color: "hsl(var(--gold))" }}
+  >
+    {text}
+  </motion.span>
+);
+
+/* ─── FIX 19: Magnetic button wrapper ─── */
+const MagneticButton = ({ children, onClick, className, style }: {
+  children: React.ReactNode;
+  onClick: () => void;
+  className?: string;
+  style?: React.CSSProperties;
+}) => {
+  const ref = useRef<HTMLButtonElement>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!ref.current) return;
+    const rect = ref.current.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = e.clientX - cx;
+    const dy = e.clientY - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    if (dist < 80) {
+      const strength = (80 - dist) / 80;
+      setOffset({ x: dx * strength * 0.3, y: dy * strength * 0.3 });
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    setOffset({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <motion.button
+      ref={ref}
+      onClick={onClick}
+      className={className}
+      style={{
+        ...style,
+        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        transition: "transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
+      }}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+    >
+      {children}
+    </motion.button>
+  );
+};
+
 /* ═══════════════════════════════════════════
    SCROLL JOURNEY — 4 cinematic beats
    ═══════════════════════════════════════════ */
@@ -76,7 +261,6 @@ const ScrollJourney = () => {
     const body = hero.querySelector(".hero-body");
     const scrollInd = document.querySelector(".scroll-hint-el");
 
-    // Set initial states
     gsap.set([eyebrow, line, line1, line2, body, scrollInd].filter(Boolean), { opacity: 0, y: 20 });
     if (line) gsap.set(line, { scaleX: 0, transformOrigin: "left center" });
 
@@ -118,7 +302,7 @@ const ScrollJourney = () => {
   const ga_ty = useTransform(p, [0.50, 0.64], [20, -8]);
 
   // Beat 4: Gate
-  const g_o = useTransform(p, [0.50, 0.58], [0, 1]); // stays 1 to end
+  const g_o = useTransform(p, [0.50, 0.58], [0, 1]);
   const g_s = useTransform(p, [0.50, 1.0], [1, 1.06]);
 
   // Coming Soon waitlist
@@ -176,6 +360,12 @@ const ScrollJourney = () => {
           <Layer src={gardenPathway} alt="Garden pathway approaching gate" scale={pw_s} opacity={pw_o} y={pw_y} z={3} />
           <Layer src={gardenGate} alt="Ornate closed garden gate" scale={g_s} opacity={g_o} z={4} />
         </div>
+
+        {/* FIX 17: Golden dust particles */}
+        <GoldenDust scrollProgress={p} />
+
+        {/* FIX 18: Foreground foliage parallax */}
+        <FoliageLayer scrollProgress={p} />
 
         {/* FIX 11: Light rays on gate */}
         <motion.div
@@ -277,28 +467,30 @@ const ScrollJourney = () => {
             >
               Into the garden
             </p>
-            <h2
-              className="font-display font-extralight leading-[0.95]"
+            <ProgressiveHeading
+              words={["Where", "Healing"]}
+              className="font-display font-extralight leading-[0.95] block"
               style={{
                 fontSize: "clamp(64px, 10vw, 130px)",
                 color: "hsl(var(--cream))",
                 textShadow: HEADING_SHADOW,
                 letterSpacing: "-0.02em",
               }}
-            >
-              Where Healing
-            </h2>
-            <h2
-              className="font-display italic font-extralight leading-[0.95]"
+              triggerProgress={[0.25, 0.32]}
+              scrollProgress={p}
+            />
+            <ProgressiveHeading
+              words={["Grows"]}
+              className="font-display italic font-extralight leading-[0.95] block"
               style={{
                 fontSize: "clamp(64px, 10vw, 130px)",
                 color: "hsl(var(--gold))",
                 textShadow: HEADING_SHADOW,
                 letterSpacing: "-0.02em",
               }}
-            >
-              Grows
-            </h2>
+              triggerProgress={[0.30, 0.34]}
+              scrollProgress={p}
+            />
             <div className="w-12 h-[1px] mx-auto mt-6" style={{ background: "hsl(var(--gold) / 0.6)" }} />
           </div>
         </motion.div>
@@ -306,28 +498,30 @@ const ScrollJourney = () => {
         {/* ─── BEAT 3: The Garden Awaits ─── */}
         <motion.div style={{ opacity: ga_to, y: ga_ty, zIndex: 20, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
           <div className="relative">
-            <h2
-              className="font-display font-extralight leading-[0.95]"
+            <ProgressiveHeading
+              words={["The", "Garden"]}
+              className="font-display font-extralight leading-[0.95] block"
               style={{
                 fontSize: "clamp(60px, 9vw, 120px)",
                 color: "hsl(var(--cream))",
                 textShadow: HEADING_SHADOW,
                 letterSpacing: "-0.02em",
               }}
-            >
-              The Garden
-            </h2>
-            <h2
-              className="font-display italic font-extralight leading-[0.95]"
+              triggerProgress={[0.51, 0.56]}
+              scrollProgress={p}
+            />
+            <ProgressiveHeading
+              words={["Awaits"]}
+              className="font-display italic font-extralight leading-[0.95] block"
               style={{
                 fontSize: "clamp(60px, 9vw, 120px)",
                 color: "hsl(var(--gold))",
                 textShadow: HEADING_SHADOW,
                 letterSpacing: "-0.02em",
               }}
-            >
-              Awaits
-            </h2>
+              triggerProgress={[0.55, 0.58]}
+              scrollProgress={p}
+            />
             <p
               className="font-body text-[11px] max-md:text-[9px] tracking-[0.5em] max-md:tracking-[0.4em] font-light uppercase mt-6"
               style={{ color: "hsl(var(--gold))", textShadow: BODY_SHADOW }}
@@ -340,6 +534,9 @@ const ScrollJourney = () => {
         {/* ─── BEAT 4: Coming Soon + Waitlist ─── */}
         <motion.div style={{ opacity: cs_to, y: cs_ty, zIndex: 21, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
           <div className="max-w-xl w-full">
+            {/* FIX 18: Morphing monogram */}
+            <MorphingMonogram progress={p} />
+
             <div className="w-16 h-[1px] mx-auto mb-8" style={{ background: "hsl(var(--gold) / 0.65)" }} />
             <p
               className="tracking-[0.65em] max-md:tracking-[0.4em] font-light uppercase mb-4 text-3xl font-sans"
@@ -376,7 +573,7 @@ const ScrollJourney = () => {
               Our botanical wellness collection is being crafted with care.
             </p>
 
-            {/* FIX 12: Waitlist signup */}
+            {/* FIX 12 + FIX 15: Waitlist signup */}
             <AnimatePresence mode="wait">
               {!submitted ? (
                 <motion.div
@@ -385,51 +582,43 @@ const ScrollJourney = () => {
                   exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.35, ease: "easeIn" } }}
                   className="mt-10 flex flex-col sm:flex-row max-md:flex-col items-center justify-center gap-6 max-md:gap-4 max-w-md mx-auto"
                 >
-                  <input
-                    id="waitlist-email"
-                    type="email"
-                    required
-                    placeholder="Enter your email"
-                    className="waitlist-input w-full sm:flex-1 max-md:w-full bg-transparent border-b border-t-0 border-l-0 border-r-0 rounded-none px-0 py-3 text-sm tracking-wider font-body transition-all duration-300 ease-out focus:outline-none opacity-20 shadow-inner"
-                    style={{
-                      color: "hsl(var(--cream))",
-                      borderColor: "hsl(var(--gold) / 0.4)",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderColor = "hsl(var(--gold))";
-                      e.target.style.borderWidth = "0 0 2px 0";
-                      e.target.style.boxShadow = "0 4px 24px hsl(var(--gold) / 0.2)";
-                      e.target.style.setProperty("--tw-placeholder-opacity", "0.1");
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderColor = "hsl(var(--gold) / 0.4)";
-                      e.target.style.borderWidth = "0 0 1px 0";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
-                  <button
+                  <div className="relative w-full sm:flex-1 max-md:w-full">
+                    <PulsingLabel text="Enter your email" />
+                    <input
+                      id="waitlist-email"
+                      type="email"
+                      required
+                      placeholder="your@email.com"
+                      className="waitlist-input w-full bg-transparent border-b border-t-0 border-l-0 border-r-0 rounded-none px-0 py-3 text-sm tracking-wider font-body transition-all duration-300 ease-out focus:outline-none mt-1"
+                      style={{
+                        color: "hsl(var(--cream))",
+                        borderColor: "hsl(var(--gold) / 0.4)",
+                        backgroundColor: "rgba(255, 255, 255, 0.05)",
+                        backdropFilter: "blur(8px)",
+                      }}
+                      onFocus={(e) => {
+                        e.target.style.borderColor = "hsl(var(--gold))";
+                        e.target.style.borderWidth = "0 0 2px 0";
+                        e.target.style.boxShadow = "0 4px 24px hsl(var(--gold) / 0.2)";
+                      }}
+                      onBlur={(e) => {
+                        e.target.style.borderColor = "hsl(var(--gold) / 0.4)";
+                        e.target.style.borderWidth = "0 0 1px 0";
+                        e.target.style.boxShadow = "none";
+                      }}
+                    />
+                  </div>
+                  <MagneticButton
                     onClick={handleSubmit}
-                    className="border-b border-t-0 border-l-0 border-r-0 rounded-none bg-transparent text-[10px] tracking-[0.35em] uppercase py-3 whitespace-nowrap font-body transition-all duration-300 opacity-20"
+                    className="rounded-none py-3 px-6 whitespace-nowrap font-body text-[11px] tracking-[0.35em] uppercase transition-all duration-300 border-none"
                     style={{
-                      color: "hsl(var(--gold) / 0.85)",
-                      borderColor: "hsl(var(--gold) / 0.4)",
-                      transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = "hsl(var(--gold))";
-                      e.currentTarget.style.borderColor = "hsl(var(--gold))";
-                      e.currentTarget.style.transform = "translateY(-2px)";
-                      e.currentTarget.style.letterSpacing = "0.42em";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = "hsl(var(--gold) / 0.85)";
-                      e.currentTarget.style.borderColor = "hsl(var(--gold) / 0.4)";
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.letterSpacing = "0.35em";
+                      background: "linear-gradient(135deg, #D4AF37 0%, #F9E4B7 50%, #D4AF37 100%)",
+                      color: "#1a1a1a",
+                      fontWeight: 500,
                     }}
                   >
                     Join the Waitlist
-                  </button>
+                  </MagneticButton>
                 </motion.div>
               ) : (
                 <motion.div
