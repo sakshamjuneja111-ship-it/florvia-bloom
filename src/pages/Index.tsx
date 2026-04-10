@@ -1,11 +1,12 @@
-import { useRef, useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
-import gsap from "gsap";
 import Navbar from "@/components/Navbar";
 import ScrollJourney from "@/components/ScrollJourney";
 import ProductsSection from "@/components/ProductsSection";
 import BrandStory from "@/components/BrandStory";
 import Footer from "@/components/Footer";
+import LoadingScreen from "@/components/LoadingScreen";
+import BloomCursor from "@/components/BloomCursor";
 
 /* ─── Luxury Marquee Strip ─── */
 const MarqueeStrip = () => (
@@ -24,57 +25,17 @@ const MarqueeStrip = () => (
   </div>
 );
 
-/* ─── Custom Cursor ─── */
-const CustomCursor = () => {
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const [hovered, setHovered] = useState(false);
+const Index = () => {
+  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    const move = (e: MouseEvent) => {
-      if (!cursorRef.current) return;
-      gsap.to(cursorRef.current, { x: e.clientX, y: e.clientY, duration: 0.5, ease: "power2.out" });
-    };
-    const onEnter = () => setHovered(true);
-    const onLeave = () => setHovered(false);
-
-    window.addEventListener("mousemove", move);
-
-    const attachHover = () => {
-      document.querySelectorAll("a, button").forEach(el => {
-        el.addEventListener("mouseenter", onEnter);
-        el.addEventListener("mouseleave", onLeave);
-      });
-    };
-
-    attachHover();
-    const observer = new MutationObserver(attachHover);
-    observer.observe(document.body, { childList: true, subtree: true });
-
-    return () => {
-      window.removeEventListener("mousemove", move);
-      observer.disconnect();
-    };
+  const handleLoadComplete = useCallback(() => {
+    setLoaded(true);
   }, []);
 
   return (
-    <div
-      ref={cursorRef}
-      className="fixed top-0 left-0 pointer-events-none z-[9999] -translate-x-1/2 -translate-y-1/2 rounded-full border transition-all duration-300 hidden md:block"
-      style={{
-        width: hovered ? 48 : 14,
-        height: hovered ? 48 : 14,
-        borderColor: hovered ? "hsl(var(--gold) / 0.5)" : "hsl(var(--cream) / 0.4)",
-        backgroundColor: hovered ? "hsl(var(--gold) / 0.08)" : "transparent",
-        mixBlendMode: "difference",
-      }}
-    />
-  );
-};
-
-const Index = () => {
-  return (
     <div className="bg-background" style={{ cursor: "none" }}>
-      <CustomCursor />
+      {!loaded && <LoadingScreen onComplete={handleLoadComplete} />}
+      <BloomCursor />
       <Navbar />
       <ScrollJourney />
       <MarqueeStrip />
