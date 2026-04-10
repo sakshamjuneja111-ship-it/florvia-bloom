@@ -342,7 +342,7 @@ const ScrollJourney = () => {
           <div className="max-w-xl w-full">
             <div className="w-16 h-[1px] mx-auto mb-8" style={{ background: "hsl(var(--gold) / 0.65)" }} />
             <p
-              className="font-body text-[12px] max-md:text-[9px] tracking-[0.65em] max-md:tracking-[0.4em] font-light uppercase mb-4"
+              className="tracking-[0.65em] max-md:tracking-[0.4em] font-light uppercase mb-4 text-3xl font-sans"
               style={{ color: "hsl(var(--gold))", textShadow: BODY_SHADOW }}
             >
               Coming Soon
@@ -390,7 +390,7 @@ const ScrollJourney = () => {
                     type="email"
                     required
                     placeholder="Enter your email"
-                    className="waitlist-input w-full sm:flex-1 max-md:w-full bg-transparent border-b border-t-0 border-l-0 border-r-0 rounded-none px-0 py-3 text-sm tracking-wider font-body transition-all duration-300 ease-out focus:outline-none"
+                    className="waitlist-input w-full sm:flex-1 max-md:w-full bg-transparent border-b border-t-0 border-l-0 border-r-0 rounded-none px-0 py-3 text-sm tracking-wider font-body transition-all duration-300 ease-out focus:outline-none opacity-20 shadow-inner"
                     style={{
                       color: "hsl(var(--cream))",
                       borderColor: "hsl(var(--gold) / 0.4)",
@@ -409,7 +409,7 @@ const ScrollJourney = () => {
                   />
                   <button
                     onClick={handleSubmit}
-                    className="border-b border-t-0 border-l-0 border-r-0 rounded-none bg-transparent text-[10px] tracking-[0.35em] uppercase py-3 whitespace-nowrap font-body transition-all duration-300"
+                    className="border-b border-t-0 border-l-0 border-r-0 rounded-none bg-transparent text-[10px] tracking-[0.35em] uppercase py-3 whitespace-nowrap font-body transition-all duration-300 opacity-20"
                     style={{
                       color: "hsl(var(--gold) / 0.85)",
                       borderColor: "hsl(var(--gold) / 0.4)",
