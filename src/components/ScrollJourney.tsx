@@ -1,13 +1,15 @@
-import { useRef, useState, useEffect, useCallback } from "react";
+import { useRef, useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { motion, useScroll, useTransform, useSpring, MotionValue, AnimatePresence } from "framer-motion";
 import gsap from "gsap";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import * as THREE from "three";
 import mountainsHero from "@/assets/mountains-hero.jpg";
 import mountainToGarden from "@/assets/mountain-to-garden.jpg";
 import gardenPathway from "@/assets/garden-pathway.jpg";
 import gardenGate from "@/assets/garden-gate.jpg";
 
-/* ─── Heavy cinematic spring ─── */
-const SPRING = { stiffness: 18, damping: 50, restDelta: 0.0003 };
+/* ─── TASK 4: Lighter spring ─── */
+const SPRING = { stiffness: 45, damping: 28, restDelta: 0.001 };
 
 const GPU: React.CSSProperties = {
   willChange: "transform, opacity",
@@ -16,21 +18,15 @@ const GPU: React.CSSProperties = {
   transform: "translateZ(0)",
 };
 
-const HEADING_SHADOW = "0 0 120px rgba(0,0,0,0.95), 0 4px 60px rgba(0,0,0,0.85), 0 2px 12px rgba(0,0,0,1)";
-const BODY_SHADOW = "0 0 30px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)";
+/* ─── TASK 2: Lightened shadows ─── */
+const HEADING_SHADOW = "0 0 60px rgba(0,0,0,0.55), 0 2px 20px rgba(0,0,0,0.45)";
+const BODY_SHADOW = "0 0 25px rgba(0,0,0,0.60), 0 1px 8px rgba(0,0,0,0.50)";
 
-const GOLD_COLORS = [
-  (a: number) => `rgba(212,175,55,${a})`,
-  (a: number) => `rgba(255,235,180,${a})`,
-  (a: number) => `rgba(200,220,150,${a})`,
-  (a: number) => `rgba(255,255,255,${a})`,
-];
-const GOLD_ALPHA_RANGES = [
-  [0.4, 0.8],
-  [0.3, 0.6],
-  [0.2, 0.5],
-  [0.15, 0.4],
-];
+/* ─── TASK 16: Reduced motion check ─── */
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const isMobileWidth = () => typeof window !== "undefined" && window.innerWidth < 768;
 
 /* ─── Image Layer ─── */
 interface LayerProps {
@@ -61,35 +57,6 @@ const TextBackdrop = () => (
     }}
   />
 );
-
-/* ─── Foreground foliage parallax ─── */
-const FoliageLayer = ({ scrollProgress }: { scrollProgress: MotionValue<number> }) => {
-  const leftY = useTransform(scrollProgress, [0, 1], [0, -600]);
-  const rightY = useTransform(scrollProgress, [0, 1], [0, -500]);
-  const foliageOpacity = useTransform(scrollProgress, [0, 0.15, 0.5, 0.7], [0.6, 0.8, 0.5, 0]);
-
-  return (
-    <>
-      <motion.div
-        style={{ y: leftY, opacity: foliageOpacity, zIndex: 11, ...GPU }}
-        className="absolute left-0 top-[20%] pointer-events-none"
-      >
-        <svg width="120" height="300" viewBox="0 0 120 300" fill="none" opacity="0.4">
-          <path d="M80 0 Q20 80 60 160 Q30 200 50 280 Q70 220 90 160 Q120 80 80 0Z" fill="hsl(var(--forest))" />
-          <path d="M40 40 Q10 120 30 200 Q50 140 40 40Z" fill="hsl(var(--forest-light))" opacity="0.5" />
-        </svg>
-      </motion.div>
-      <motion.div
-        style={{ y: rightY, opacity: foliageOpacity, zIndex: 11, ...GPU }}
-        className="absolute right-0 top-[30%] pointer-events-none"
-      >
-        <svg width="100" height="260" viewBox="0 0 100 260" fill="none" opacity="0.35">
-          <path d="M20 0 Q80 60 40 140 Q70 180 50 260 Q30 200 10 140 Q-20 60 20 0Z" fill="hsl(var(--forest))" />
-        </svg>
-      </motion.div>
-    </>
-  );
-};
 
 /* ─── Morphing F monogram ─── */
 const MorphingMonogram = ({ progress }: { progress: MotionValue<number> }) => {
@@ -169,7 +136,7 @@ const ProgressiveHeading = ({
             display: "inline-block",
             marginRight: "0.3em",
             textShadow: revealed[i]
-              ? `${HEADING_SHADOW}, 0 0 40px hsl(var(--gold) / 0.3)`
+              ? `${HEADING_SHADOW}, 0 0 40px rgba(212,175,55,0.3)`
               : HEADING_SHADOW,
           }}
         >
@@ -180,7 +147,7 @@ const ProgressiveHeading = ({
   );
 };
 
-/* ─── FIX 8: Word-by-word glint heading for Something Beautiful ─── */
+/* ─── Glint heading word ─── */
 const GlintWord = ({
   word,
   delay,
@@ -208,10 +175,10 @@ const GlintWord = ({
         { opacity: 0, y: 20 },
         { opacity: 1, y: 0, duration: 0.7, ease: "power3.out", delay }
       );
-      // Glint: color sweep cream → gold → original
+      // Glint: color sweep to gold and back
       gsap.to(el, {
         keyframes: [
-          { color: "hsl(var(--gold))", duration: 0.15 },
+          { color: "#D4AF37", duration: 0.15 },
           { color, duration: 0.25 },
         ],
         delay: delay + 0.1,
@@ -241,6 +208,219 @@ const GlintWord = ({
   );
 };
 
+/* ─── TASK 12: Three.js Gold Dust Particles ─── */
+const GoldDustScene = ({ scrollProgressRef }: { scrollProgressRef: React.MutableRefObject<number> }) => {
+  const pointsRef = useRef<THREE.Points>(null);
+  const count = isMobileWidth() ? 0 : 2000; // Task 16: disabled on mobile
+
+  const positions = useMemo(() => {
+    const arr = new Float32Array(count * 3);
+    for (let i = 0; i < count; i++) {
+      arr[i * 3] = (Math.random() - 0.5) * 10;
+      arr[i * 3 + 1] = Math.random() * 7 - 3;
+      arr[i * 3 + 2] = Math.random() * 2.5 - 2;
+    }
+    return arr;
+  }, [count]);
+
+  useFrame(() => {
+    if (!pointsRef.current || count === 0) return;
+    const geo = pointsRef.current.geometry;
+    const posAttr = geo.attributes.position as THREE.BufferAttribute;
+    const arr = posAttr.array as Float32Array;
+    const progress = scrollProgressRef.current;
+    const gateActive = progress > 0.58;
+    const gateStrength = gateActive ? (progress - 0.58) / 0.42 : 0;
+
+    for (let i = 0; i < count; i++) {
+      const ix = i * 3;
+      const iy = i * 3 + 1;
+      const iz = i * 3 + 2;
+
+      arr[iy] += 0.0003;
+
+      if (gateActive) {
+        arr[ix] += (0 - arr[ix]) * gateStrength * 0.0008;
+      }
+
+      if (arr[iy] > 4) {
+        arr[ix] = (Math.random() - 0.5) * 10;
+        arr[iy] = -3;
+        arr[iz] = Math.random() * 2.5 - 2;
+      }
+    }
+
+    pointsRef.current.rotation.y += 0.00008;
+    posAttr.needsUpdate = true;
+  });
+
+  if (count === 0) return null;
+
+  return (
+    <points ref={pointsRef}>
+      <bufferGeometry>
+        <bufferAttribute
+          attach="attributes-position"
+          args={[positions, 3]}
+          count={count}
+        />
+      </bufferGeometry>
+      <pointsMaterial
+        size={0.008}
+        color="#C9A84C"
+        transparent
+        opacity={0.7}
+        sizeAttenuation
+        depthWrite={false}
+      />
+    </points>
+  );
+};
+
+/* ─── TASK 13: Volumetric Rays ─── */
+const VolumetricRays = ({ gateOpacity }: { gateOpacity: MotionValue<number> }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rays = container.querySelectorAll<HTMLDivElement>(".vol-ray");
+    const tweens: gsap.core.Tween[] = [];
+
+    rays.forEach((ray, i) => {
+      const t = gsap.to(ray, {
+        opacity: `random(0.6, 1.0)`,
+        duration: 4 + Math.random() * 5,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+        delay: Math.random() * 4,
+      });
+      tweens.push(t);
+    });
+
+    const rotTween = gsap.to(container, {
+      rotation: 1,
+      duration: 20,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1,
+    });
+    tweens.push(rotTween);
+
+    return () => tweens.forEach((t) => t.kill());
+  }, []);
+
+  const rays = useMemo(() => {
+    const count = 8;
+    const angleStep = 70 / (count - 1);
+    return Array.from({ length: count }, (_, i) => {
+      const angle = -35 + angleStep * i;
+      const width = 60 + Math.random() * 120;
+      const blur = 20 + (width / 180) * 25;
+      const baseOpacity = 0.18 + Math.random() * 0.10;
+      return { angle, width, blur, baseOpacity };
+    });
+  }, []);
+
+  return (
+    <motion.div
+      ref={containerRef}
+      style={{ opacity: gateOpacity, zIndex: 13, ...GPU }}
+      className="absolute inset-0 pointer-events-none"
+      aria-hidden
+    >
+      {rays.map((r, i) => (
+        <div
+          key={i}
+          className="vol-ray absolute"
+          style={{
+            left: "50%",
+            top: "8%",
+            width: `${r.width}px`,
+            height: "100%",
+            transformOrigin: "top center",
+            transform: `translateX(-50%) rotate(${r.angle}deg)`,
+            background: `linear-gradient(to bottom, rgba(255,235,140,${r.baseOpacity}) 0%, rgba(255,220,100,0.06) 40%, transparent 85%)`,
+            filter: `blur(${r.blur}px)`,
+            opacity: r.baseOpacity,
+          }}
+        />
+      ))}
+    </motion.div>
+  );
+};
+
+/* ─── TASK 14: Film Grain ─── */
+const FilmGrain = ({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    const mobile = isMobileWidth();
+    let frameCount = 0;
+    let rafId: number;
+
+    const resize = () => {
+      const w = Math.floor(container.clientWidth / 2);
+      const h = Math.floor(container.clientHeight / 2);
+      canvas.width = w;
+      canvas.height = h;
+    };
+    resize();
+
+    const render = () => {
+      frameCount++;
+      const skipInterval = mobile ? 3 : 2;
+      if (frameCount % skipInterval === 0) {
+        const w = canvas.width;
+        const h = canvas.height;
+        const imageData = ctx.createImageData(w, h);
+        const data = imageData.data;
+        for (let i = 0; i < data.length; i += 4) {
+          const v = Math.random() * 255;
+          data[i] = v;
+          data[i + 1] = v;
+          data[i + 2] = v;
+          data[i + 3] = Math.random() * 28;
+        }
+        ctx.putImageData(imageData, 0, 0);
+      }
+      rafId = requestAnimationFrame(render);
+    };
+
+    rafId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(rafId);
+  }, [containerRef]);
+
+  if (prefersReducedMotion()) return null;
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: "absolute",
+        inset: 0,
+        width: "100%",
+        height: "100%",
+        zIndex: 22,
+        pointerEvents: "none",
+        mixBlendMode: "overlay",
+        opacity: 0.032,
+      }}
+    />
+  );
+};
+
 /* ═══════════════════════════════════════════
    SCROLL JOURNEY — 4 cinematic beats
    ═══════════════════════════════════════════ */
@@ -252,11 +432,18 @@ const ScrollJourney = () => {
   const heroRef = useRef<HTMLDivElement>(null);
   const waitlistBtnRef = useRef<HTMLButtonElement>(null);
   const [submitted, setSubmitted] = useState(false);
+  const scrollProgressRef = useRef(0);
 
   const { scrollYProgress: raw } = useScroll({ target: ref, offset: ["start start", "end end"] });
   const p = useSpring(raw, SPRING);
 
-  /* ─── FIX 1: Organic pollen particles ─── */
+  // Keep ref in sync for Three.js
+  useEffect(() => {
+    const unsub = p.on("change", (v) => { scrollProgressRef.current = v; });
+    return unsub;
+  }, [p]);
+
+  /* ─── TASK 1: 180 layered organic pollen ─── */
   useEffect(() => {
     const container = stickyRef.current;
     if (!container) return;
@@ -266,75 +453,460 @@ const ScrollJourney = () => {
     const timelines: gsap.core.Timeline[] = [];
 
     const rnd = (min: number, max: number) => Math.random() * (max - min) + min;
+    const goldColor = (a: number) => `rgba(212,175,55,${a})`;
 
-    for (let i = 0; i < 60; i++) {
+    interface PollenLayer {
+      count: number;
+      zIndex: number;
+      sizeMin: number;
+      sizeMax: number;
+      alphaMin: number;
+      alphaMax: number;
+      driftMin: number;
+      driftMax: number;
+    }
+
+    const layers: PollenLayer[] = [
+      { count: 60, zIndex: 18, sizeMin: 4, sizeMax: 7, alphaMin: 0.7, alphaMax: 0.9, driftMin: 6, driftMax: 14 },
+      { count: 80, zIndex: 14, sizeMin: 2, sizeMax: 4, alphaMin: 0.4, alphaMax: 0.65, driftMin: 12, driftMax: 22 },
+      { count: 40, zIndex: 10, sizeMin: 1, sizeMax: 2.5, alphaMin: 0.15, alphaMax: 0.35, driftMin: 20, driftMax: 35 },
+    ];
+
+    const createPollen = (
+      size: number,
+      alpha: number,
+      zIndex: number,
+      driftMin: number,
+      driftMax: number,
+      isOblong: boolean,
+      isHero: boolean,
+      isForeground: boolean,
+    ) => {
       const el = document.createElement("div");
-      const colorIdx = Math.floor(Math.random() * 4);
-      const alpha = rnd(GOLD_ALPHA_RANGES[colorIdx][0], GOLD_ALPHA_RANGES[colorIdx][1]);
-      const size = rnd(2, 5);
-      const isOblong = Math.random() < 0.3;
       const w = size;
-      const h = isOblong ? size * 1.6 : size;
+      const h = isOblong ? size * 1.8 : size;
 
       Object.assign(el.style, {
         position: "absolute",
         pointerEvents: "none",
-        zIndex: "16",
+        zIndex: String(zIndex),
         borderRadius: isOblong ? "40%" : "50%",
         willChange: "transform, opacity",
         width: `${w}px`,
         height: `${h}px`,
-        background: GOLD_COLORS[colorIdx](alpha),
+        background: goldColor(alpha),
         left: `${rnd(0, 100)}%`,
-        top: `${rnd(20, 100)}%`,
+        top: `${rnd(25, 100)}%`,
+        opacity: String(alpha),
       });
+
+      if (isHero) {
+        el.style.boxShadow = `0 0 6px 2px rgba(212,175,55,0.4)`;
+      }
 
       container.appendChild(el);
       particles.push(el);
 
-      // Drift animation
-      const tl = gsap.timeline({ repeat: -1 });
+      // Non-linear 2-tween drift path
       const buildDrift = () => {
-        const curX = parseFloat(el.style.left);
-        const curY = parseFloat(el.style.top);
-        const x1 = curX + rnd(-18, 18); // percentage-based drift
-        const y1 = Math.max(-5, curY - rnd(12, 40));
-        const d1 = rnd(8, 22);
-        const x2 = x1 + rnd(-12, 12);
-        const y2 = Math.max(-5, y1 - rnd(8, 20));
-        const d2 = rnd(5, 14);
+        const tl = gsap.timeline({
+          repeat: -1,
+          onRepeat: () => {
+            // Reset to bottom
+            gsap.set(el, { left: `${rnd(0, 100)}%`, top: `${rnd(95, 110)}%` });
+          },
+        });
 
-        tl.to(el, { left: `${x1}%`, top: `${y1}%`, duration: d1, ease: "none" });
-        tl.to(el, { left: `${x2}%`, top: `${y2}%`, duration: d2, ease: "none" });
-        tl.set(el, { left: `${rnd(0, 100)}%`, top: `${rnd(95, 105)}%` });
+        const x1 = rnd(-250, 250);
+        const y1 = -rnd(100, 300);
+        const x2 = rnd(-250, 250);
+        const y2 = -rnd(100, 200);
+        const d1 = rnd(driftMin, driftMax) * 0.6;
+        const d2 = rnd(driftMin, driftMax) * 0.4;
+
+        tl.to(el, {
+          x: `+=${x1}`,
+          y: `+=${y1}`,
+          duration: d1,
+          ease: "power1.inOut",
+        });
+        tl.to(el, {
+          x: `+=${x2}`,
+          y: `+=${y2}`,
+          duration: d2,
+          ease: "power1.inOut",
+        });
+
+        timelines.push(tl);
       };
       buildDrift();
-      timelines.push(tl);
 
       // Breathing opacity
       const breathe = gsap.to(el, {
-        opacity: alpha * 0.5,
-        duration: rnd(3, 8),
+        opacity: alpha * 0.4,
+        duration: rnd(2, 6),
         ease: "sine.inOut",
         repeat: -1,
         yoyo: true,
       });
       tweens.push(breathe);
 
-      // Rotation
-      const rot = gsap.to(el, {
-        rotation: 360,
-        duration: rnd(10, 30),
-        repeat: -1,
-        ease: "none",
+      // Rotation for oblong
+      if (isOblong) {
+        const rot = gsap.to(el, {
+          rotation: 360,
+          duration: rnd(8, 20),
+          repeat: -1,
+          ease: "none",
+        });
+        tweens.push(rot);
+      }
+    };
+
+    // Create 3 depth layers
+    layers.forEach((layer) => {
+      for (let i = 0; i < layer.count; i++) {
+        const size = rnd(layer.sizeMin, layer.sizeMax);
+        const alpha = rnd(layer.alphaMin, layer.alphaMax);
+        const isOblong = Math.random() < 0.25;
+        createPollen(size, alpha, layer.zIndex, layer.driftMin, layer.driftMax, isOblong, false, layer.zIndex === 18);
+      }
+    });
+
+    // 12 hero pollen grains (foreground)
+    for (let i = 0; i < 12; i++) {
+      const size = rnd(8, 12);
+      const alpha = rnd(0.5, 0.7);
+      createPollen(size, alpha, 18, 25, 45, false, true, true);
+    }
+
+    // Gate beat centre bias for foreground particles (z-index 18)
+    const gateInterval = setInterval(() => {
+      const progress = scrollProgressRef.current;
+      if (progress < 0.58) return;
+      const strength = Math.min(1, (progress - 0.58) / 0.42);
+      const bias = strength * 15;
+      particles.forEach((el) => {
+        if (el.style.zIndex === "18") {
+          const rect = el.getBoundingClientRect();
+          const containerRect = container.getBoundingClientRect();
+          const centreDist = rect.left + rect.width / 2 - (containerRect.left + containerRect.width / 2);
+          if (Math.abs(centreDist) > 50) {
+            const adjust = centreDist > 0 ? -bias * 0.02 : bias * 0.02;
+            gsap.to(el, { x: `+=${adjust}`, duration: 0.5, ease: "none", overwrite: "auto" });
+          }
+        }
       });
-      tweens.push(rot);
+    }, 200);
+
+    return () => {
+      clearInterval(gateInterval);
+      timelines.forEach((t) => t.kill());
+      tweens.forEach((t) => t.kill());
+      particles.forEach((el) => {
+        gsap.killTweensOf(el);
+        el.remove();
+      });
+    };
+  }, []);
+
+  /* ─── TASK 5: Light shafts ─── */
+  useEffect(() => {
+    const container = stickyRef.current;
+    if (!container) return;
+
+    const shaft1 = document.createElement("div");
+    const shaft2 = document.createElement("div");
+
+    const shaftBase: Partial<CSSStyleDeclaration> = {
+      position: "absolute",
+      top: "0",
+      height: "60%",
+      pointerEvents: "none",
+      background: "linear-gradient(to bottom, transparent 0%, rgba(255,240,180,0.12) 50%, transparent 100%)",
+    };
+
+    Object.assign(shaft1.style, {
+      ...shaftBase,
+      width: "3px",
+      left: "40%",
+      transform: "rotate(-15deg)",
+      zIndex: "11",
+      opacity: "0.4",
+    });
+
+    Object.assign(shaft2.style, {
+      ...shaftBase,
+      width: "2px",
+      left: "58%",
+      transform: "rotate(-12deg)",
+      zIndex: "11",
+      opacity: "0.3",
+    });
+
+    container.appendChild(shaft1);
+    container.appendChild(shaft2);
+
+    const t1 = gsap.to(shaft1, { opacity: 0.9, duration: 8, ease: "sine.inOut", yoyo: true, repeat: -1 });
+    const t2 = gsap.to(shaft2, { opacity: 0.75, duration: 11, ease: "sine.inOut", yoyo: true, repeat: -1, delay: 3 });
+
+    // Visibility tied to scroll via polling
+    const visInterval = setInterval(() => {
+      const prog = scrollProgressRef.current;
+      // Shaft 1 visible during Beat 1
+      shaft1.style.display = prog < 0.30 ? "block" : "none";
+      // Shaft 2 visible during Beat 1 and 2
+      shaft2.style.display = prog < 0.52 ? "block" : "none";
+    }, 100);
+
+    return () => {
+      clearInterval(visInterval);
+      t1.kill();
+      t2.kill();
+      shaft1.remove();
+      shaft2.remove();
+    };
+  }, []);
+
+  /* ─── TASK 7: Dewdrop sparkles ─── */
+  useEffect(() => {
+    const container = stickyRef.current;
+    if (!container) return;
+
+    const sparkles: SVGSVGElement[] = [];
+    const tweens: gsap.core.Tween[] = [];
+
+    for (let i = 0; i < 20; i++) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      const size = 8 + Math.random() * 6;
+      svg.setAttribute("width", String(size));
+      svg.setAttribute("height", String(size));
+      svg.setAttribute("viewBox", "0 0 20 20");
+      svg.innerHTML = `<path d="M10 0 L12 8 L20 10 L12 12 L10 20 L8 12 L0 10 L8 8 Z" fill="rgba(255,250,230,0.7)" />`;
+      Object.assign(svg.style, {
+        position: "absolute",
+        pointerEvents: "none",
+        zIndex: "17",
+        left: `${Math.random() * 90 + 5}%`,
+        top: `${Math.random() * 80 + 10}%`,
+        opacity: "0",
+      });
+      container.appendChild(svg);
+      sparkles.push(svg);
+
+      const delay = Math.random() * 12 + 2;
+      const sparkle = () => {
+        gsap.to(svg, {
+          keyframes: [
+            { opacity: 0, duration: 0 },
+            { opacity: 1, duration: 0.15 },
+            { opacity: 1, duration: 0.08 },
+            { opacity: 0, duration: 0.3 },
+          ],
+          delay: 4 + Math.random() * 8,
+          onComplete: sparkle,
+        });
+      };
+      // Stagger initial starts
+      const initTween = gsap.delayedCall(delay, sparkle);
+      tweens.push(initTween as any);
     }
 
     return () => {
-      timelines.forEach((t) => t.kill());
       tweens.forEach((t) => t.kill());
-      particles.forEach((el) => el.remove());
+      sparkles.forEach((s) => {
+        gsap.killTweensOf(s);
+        s.remove();
+      });
+    };
+  }, []);
+
+  /* ─── TASK 9: Hero breathing ─── */
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const container = stickyRef.current;
+    if (!container) return;
+
+    const breathDiv = document.createElement("div");
+    Object.assign(breathDiv.style, {
+      position: "absolute",
+      inset: "0",
+      pointerEvents: "none",
+      zIndex: "8",
+      background: "rgba(255,250,240,1)",
+      opacity: "0",
+    });
+    container.appendChild(breathDiv);
+
+    const tween = gsap.to(breathDiv, {
+      opacity: 0.025,
+      duration: 6,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1,
+    });
+
+    return () => {
+      tween.kill();
+      breathDiv.remove();
+    };
+  }, []);
+
+  /* ─── TASK 11: Bokeh leaves ─── */
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const container = stickyRef.current;
+    if (!container) return;
+
+    const mobile = isMobileWidth();
+    const count = mobile ? 18 : 35;
+    const bokehEls: HTMLDivElement[] = [];
+    const tweens: gsap.core.Tween[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const el = document.createElement("div");
+      const size = Math.random() * Math.random() * 100 + 40;
+      const colors = [
+        `rgba(100,130,70,${0.04 + Math.random() * 0.08})`,
+        `rgba(180,155,80,${0.05 + Math.random() * 0.09})`,
+        `rgba(60,90,40,${0.03 + Math.random() * 0.06})`,
+        `rgba(200,180,100,${0.04 + Math.random() * 0.06})`,
+      ];
+      const color = colors[Math.floor(Math.random() * 4)];
+      const blur = 18 + (size / 140) * 37;
+
+      // 60% near edges
+      let left: number;
+      if (Math.random() < 0.6) {
+        left = Math.random() < 0.5 ? Math.random() * 200 : container.clientWidth - Math.random() * 200;
+      } else {
+        left = Math.random() * container.clientWidth;
+      }
+
+      Object.assign(el.style, {
+        position: "absolute",
+        pointerEvents: "none",
+        zIndex: "19",
+        borderRadius: "50%",
+        width: `${size}px`,
+        height: `${size}px`,
+        background: color,
+        filter: `blur(${blur}px)`,
+        left: `${left}px`,
+        top: `${Math.random() * container.clientHeight}px`,
+        willChange: "transform, opacity",
+      });
+
+      container.appendChild(el);
+      bokehEls.push(el);
+
+      // Drift
+      const drift = gsap.to(el, {
+        x: `random(-30, 30)`,
+        y: `random(-20, 20)`,
+        duration: 18 + Math.random() * 22,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+      });
+      tweens.push(drift);
+
+      // Opacity breathe
+      const breath = gsap.to(el, {
+        opacity: 0.5,
+        duration: 6 + Math.random() * 10,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+      });
+      tweens.push(breath);
+    }
+
+    // Fade with beats
+    const fadeInterval = setInterval(() => {
+      const prog = scrollProgressRef.current;
+      const targetOpacity = prog < 0.42 ? 1 : 0.6;
+      bokehEls.forEach((el) => {
+        el.style.opacity = String(targetOpacity);
+      });
+    }, 200);
+
+    return () => {
+      clearInterval(fadeInterval);
+      tweens.forEach((t) => t.kill());
+      bokehEls.forEach((el) => {
+        gsap.killTweensOf(el);
+        el.remove();
+      });
+    };
+  }, []);
+
+  /* ─── TASK 15: Atmospheric mist ─── */
+  useEffect(() => {
+    if (prefersReducedMotion()) return;
+    const container = stickyRef.current;
+    if (!container) return;
+
+    const mistEls: HTMLDivElement[] = [];
+    const tweens: gsap.core.Tween[] = [];
+
+    for (let i = 0; i < 5; i++) {
+      const el = document.createElement("div");
+      const size = 400 + Math.random() * 400;
+      const alpha = 0.04 + Math.random() * 0.04;
+
+      Object.assign(el.style, {
+        position: "absolute",
+        pointerEvents: "none",
+        zIndex: "9",
+        width: `${size}px`,
+        height: `${size}px`,
+        borderRadius: "50%",
+        background: `radial-gradient(circle, rgba(220,235,215,${alpha}) 0%, transparent 70%)`,
+        left: `${Math.random() * 80}%`,
+        top: `${50 + Math.random() * 40}%`,
+        willChange: "transform",
+      });
+
+      container.appendChild(el);
+      mistEls.push(el);
+
+      const driftX = gsap.to(el, {
+        x: `random(-60, 60)`,
+        duration: 30 + Math.random() * 25,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+      });
+      tweens.push(driftX);
+
+      const driftY = gsap.to(el, {
+        y: `random(-30, 30)`,
+        duration: 35 + Math.random() * 20,
+        ease: "sine.inOut",
+        yoyo: true,
+        repeat: -1,
+      });
+      tweens.push(driftY);
+    }
+
+    // Beat-dependent opacity
+    const mistInterval = setInterval(() => {
+      const prog = scrollProgressRef.current;
+      let opacity = 0.5;
+      if (prog < 0.22) opacity = 0.8;
+      else if (prog < 0.52) opacity = 0.5;
+      else opacity = 0.4 + Math.sin(Date.now() / 3000) * 0.125;
+      mistEls.forEach((el) => { el.style.opacity = String(opacity); });
+    }, 200);
+
+    return () => {
+      clearInterval(mistInterval);
+      tweens.forEach((t) => t.kill());
+      mistEls.forEach((el) => {
+        gsap.killTweensOf(el);
+        el.remove();
+      });
     };
   }, []);
 
@@ -367,7 +939,7 @@ const ScrollJourney = () => {
     return () => { tl.kill(); };
   }, []);
 
-  /* ─── FIX 4: Magnetic pull for waitlist button ─── */
+  /* ─── Magnetic pull for waitlist button ─── */
   useEffect(() => {
     const btn = waitlistBtnRef.current;
     if (!btn) return;
@@ -389,12 +961,7 @@ const ScrollJourney = () => {
           ease: "power2.out",
         });
       } else {
-        gsap.to(btn, {
-          x: 0,
-          y: 0,
-          duration: 0.6,
-          ease: "elastic.out(1, 0.4)",
-        });
+        gsap.to(btn, { x: 0, y: 0, duration: 0.6, ease: "elastic.out(1, 0.4)" });
       }
     };
 
@@ -402,7 +969,7 @@ const ScrollJourney = () => {
     return () => window.removeEventListener("mousemove", onMove);
   }, []);
 
-  /* ─── Redistributed scroll timings at 800vh ─── */
+  /* ─── Redistributed scroll timings ─── */
 
   // Beat 1: Mountains
   const m_s = useTransform(p, [0, 0.30], [1, 1.15]);
@@ -434,12 +1001,10 @@ const ScrollJourney = () => {
   const cs_to = useTransform(p, [0.66, 0.74, 0.94, 1.0], [0, 1, 1, 0.5]);
   const cs_ty = useTransform(p, [0.66, 0.74], [15, 0]);
 
-  // Track visibility for glint heading
+  // Glint heading visibility
   const [somethingVisible, setSomethingVisible] = useState(false);
   useEffect(() => {
-    const unsub = p.on("change", (v) => {
-      setSomethingVisible(v >= 0.68 && v <= 0.94);
-    });
+    const unsub = p.on("change", (v) => { setSomethingVisible(v >= 0.68 && v <= 0.94); });
     return unsub;
   }, [p]);
 
@@ -448,28 +1013,38 @@ const ScrollJourney = () => {
   const exitScale = useTransform(p, [0.94, 1.0], [1, 1.05]);
 
   // Scroll hint
-  const scrollHint = useTransform(p, [0, 0.03], [1, 0]);
+  const scrollHint = useTransform(p, [0, 0.04], [1, 0]);
 
   // Atmospheric haze
   const hazeOpacity = useTransform(p, [0, 0.15, 0.5, 0.85, 1.0], [0.06, 0.12, 0.18, 0.12, 0.25]);
 
-  // Vignette always >= 0.4
-  const vig = useTransform(p, [0, 0.5, 0.58, 1.0], [0.4, 0.4, 0.6, 0.6]);
+  // TASK 2: Vignette reduced
+  const vig = useTransform(p, [0, 0.5, 0.58, 1.0], [0.22, 0.22, 0.38, 0.38]);
 
-  // Color grading
+  // TASK 2: Color grading reduced by 40%
   const colorGrade = useTransform(p, [0, 0.25, 0.45, 0.58, 1.0], [
-    "rgba(20,35,25,0.08)",
-    "rgba(15,30,20,0.10)",
-    "rgba(25,30,15,0.08)",
-    "rgba(40,30,10,0.12)",
-    "rgba(40,30,10,0.12)",
+    "rgba(20,35,25,0.048)",
+    "rgba(15,30,20,0.060)",
+    "rgba(25,30,15,0.048)",
+    "rgba(40,30,10,0.072)",
+    "rgba(40,30,10,0.072)",
   ]);
 
-  // Light ray on gate
+  // TASK 8: Enhanced gate light ray
+  const gateLightO = useTransform(p, [0.58, 0.68], [0, 1]);
+
+  // TASK 13: Volumetric rays opacity
+  const volRayO = useTransform(p, [0.52, 0.65], [0, 1]);
+
+  // Light ray on gate (old)
   const lightRayO = useTransform(p, [0.55, 0.65, 0.95, 1.0], [0, 1, 1, 0.85]);
 
   // Progress line
   const progressOpacity = useTransform(p, [0, 0.05, 0.90, 0.94], [0, 0.6, 0.6, 0]);
+
+  // TASK 6: Botanical edge transforms
+  const leftEdgeY = useTransform(p, [0, 1], [0, -60]);
+  const rightEdgeY = useTransform(p, [0, 1], [0, -40]);
 
   const handleSubmit = () => {
     const input = document.querySelector<HTMLInputElement>('#waitlist-email');
@@ -478,6 +1053,8 @@ const ScrollJourney = () => {
       input.value = '';
     }
   };
+
+  const mobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   return (
     <section ref={ref} className="relative h-[800vh]">
@@ -494,19 +1071,27 @@ const ScrollJourney = () => {
           <Layer src={gardenGate} alt="Ornate closed garden gate" scale={g_s} opacity={g_o} z={4} />
         </div>
 
-        {/* Foreground foliage parallax */}
-        <FoliageLayer scrollProgress={p} />
+        {/* TASK 9: Hero breathing */}
+        {/* (created via DOM in useEffect above) */}
 
-        {/* Light rays on gate */}
+        {/* TASK 15: Mist (created via DOM) */}
+
+        {/* TASK 8: Enhanced gate light overlay */}
         <motion.div
-          style={{ opacity: lightRayO, zIndex: 12, ...GPU }}
+          style={{ opacity: gateLightO, zIndex: 12, ...GPU }}
           className="absolute inset-0 pointer-events-none"
           aria-hidden
         >
           <div className="absolute inset-0" style={{
-            background: "radial-gradient(ellipse at 50% 0%, rgba(255,235,150,0.22) 0%, transparent 65%)"
+            background: "conic-gradient(from 0deg at 50% 15%, rgba(255,235,140,0.18) 0deg, rgba(255,220,100,0.09) 20deg, rgba(255,200,80,0.04) 45deg, transparent 90deg, transparent 270deg, rgba(255,200,80,0.04) 315deg, rgba(255,220,100,0.09) 340deg, rgba(255,235,140,0.18) 360deg)",
+          }} />
+          <div className="absolute inset-0" style={{
+            background: "radial-gradient(circle at 50% 20%, rgba(255,240,160,0.14) 0%, transparent 55%)",
           }} />
         </motion.div>
+
+        {/* TASK 13: Volumetric rays */}
+        {!prefersReducedMotion() && <VolumetricRays gateOpacity={volRayO} />}
 
         {/* Vignette */}
         <motion.div style={{ opacity: vig, zIndex: 15 }} className="absolute inset-0 pointer-events-none" aria-hidden>
@@ -517,10 +1102,26 @@ const ScrollJourney = () => {
 
         {/* Color grading */}
         <motion.div
-          style={{ backgroundColor: colorGrade, zIndex: 16, mixBlendMode: "color", ...GPU }}
+          style={{ backgroundColor: colorGrade, zIndex: 10, mixBlendMode: "color", ...GPU }}
           className="absolute inset-0 pointer-events-none"
           aria-hidden
         />
+
+        {/* TASK 12: Three.js gold dust */}
+        {!prefersReducedMotion() && !mobile && (
+          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 15 }}>
+            <Canvas
+              camera={{ position: [0, 0, 3] }}
+              gl={{ alpha: true, antialias: false }}
+              style={{ background: "transparent", width: "100%", height: "100%" }}
+              frameloop="always"
+            >
+              <Suspense fallback={null}>
+                <GoldDustScene scrollProgressRef={scrollProgressRef} />
+              </Suspense>
+            </Canvas>
+          </div>
+        )}
 
         {/* Atmospheric haze */}
         <motion.div style={{ opacity: hazeOpacity, zIndex: 18, ...GPU }} className="absolute inset-0 pointer-events-none" aria-hidden>
@@ -539,12 +1140,71 @@ const ScrollJourney = () => {
           }} />
         </div>
 
+        {/* TASK 6: Botanical edge silhouettes */}
+        <motion.div
+          style={{ y: leftEdgeY, zIndex: 19, ...GPU }}
+          className="absolute left-0 top-0 bottom-0 pointer-events-none"
+        >
+          <div style={{
+            width: mobile ? "100px" : "220px",
+            height: "100%",
+            position: "relative",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0,
+              background: mobile
+                ? "linear-gradient(to right, rgba(15,25,12,0.315) 0%, transparent 100%)"
+                : "linear-gradient(to right, rgba(15,25,12,0.45) 0%, transparent 100%)",
+            }} />
+            <svg width={mobile ? "100" : "220"} height="100%" viewBox={mobile ? "0 0 100 800" : "0 0 220 800"} fill="none" style={{ position: "absolute", inset: 0, height: "100%" }} preserveAspectRatio="none">
+              <path d="M0 100 Q30 150 15 250 Q5 300 20 400 Q35 350 25 280 Q15 200 0 100Z" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M0 300 Q40 340 20 420 Q10 480 25 550 Q40 500 30 440 Q15 380 0 300Z" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M5 500 Q50 520 30 600 Q15 660 5 720" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M0 150 Q60 200 40 300" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M10 400 Q55 430 35 520 Q20 570 10 630" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M0 50 Q25 80 10 130 Q-5 180 15 230" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M3 600 Q45 640 30 700 Q15 740 3 780" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+              <path d="M0 200 Q35 220 25 280 Q10 330 0 370" stroke="rgba(100,130,80,0.35)" strokeWidth="0.6" fill="none" />
+            </svg>
+          </div>
+        </motion.div>
+
+        <motion.div
+          style={{ y: rightEdgeY, zIndex: 19, ...GPU }}
+          className="absolute right-0 top-0 bottom-0 pointer-events-none"
+        >
+          <div style={{
+            width: mobile ? "100px" : "200px",
+            height: "100%",
+            position: "relative",
+            marginLeft: "auto",
+          }}>
+            <div style={{
+              position: "absolute", inset: 0,
+              background: mobile
+                ? "linear-gradient(to left, rgba(15,25,12,0.28) 0%, transparent 100%)"
+                : "linear-gradient(to left, rgba(15,25,12,0.40) 0%, transparent 100%)",
+            }} />
+            <svg width={mobile ? "100" : "200"} height="100%" viewBox={mobile ? "0 0 100 800" : "0 0 200 800"} fill="none" style={{ position: "absolute", inset: 0, height: "100%" }} preserveAspectRatio="none">
+              <path d="M200 120 Q170 170 185 270 Q195 320 180 420 Q165 370 175 300 Q185 220 200 120Z" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+              <path d="M200 350 Q160 390 180 470 Q190 530 175 600 Q160 550 170 490 Q185 430 200 350Z" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+              <path d="M195 550 Q150 580 170 660 Q185 720 195 780" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+              <path d="M200 80 Q155 120 175 200" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+              <path d="M198 250 Q160 280 178 360 Q192 410 198 470" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+              <path d="M200 450 Q165 475 180 540 Q192 580 200 640" stroke="rgba(100,130,80,0.30)" strokeWidth="0.6" fill="none" />
+            </svg>
+          </div>
+        </motion.div>
+
+        {/* TASK 14: Film grain */}
+        <FilmGrain containerRef={stickyRef} />
+
         {/* ══════ TEXT BEATS ══════ */}
 
         {/* ─── BEAT 1: Hero ─── */}
         <motion.div
           ref={heroRef}
-          style={{ opacity: m_to, y: m_ty, zIndex: 20, ...GPU }}
+          style={{ opacity: m_to, y: m_ty, zIndex: 23, ...GPU }}
           className="absolute inset-0 flex flex-col items-center justify-center text-center px-6"
         >
           <div className="relative">
@@ -555,7 +1215,7 @@ const ScrollJourney = () => {
             >
               Organic Health &amp; Wellness
             </p>
-            <div className="hero-line w-12 h-[1px] mx-auto mb-8" style={{ background: "hsl(var(--gold) / 0.7)" }} />
+            <div className="hero-line w-12 h-[1px] mx-auto mb-8" style={{ background: "hsl(var(--gold) / 0.65)" }} />
             <h1
               className="hero-line1 font-display font-extralight leading-[0.92] max-md:leading-[0.92]"
               style={{
@@ -588,7 +1248,7 @@ const ScrollJourney = () => {
         </motion.div>
 
         {/* ─── BEAT 2: Garden entry ─── */}
-        <motion.div style={{ opacity: d_to, y: d_ty, zIndex: 20, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
+        <motion.div style={{ opacity: d_to, y: d_ty, zIndex: 23, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
           <div className="relative">
             <TextBackdrop />
             <p
@@ -626,7 +1286,7 @@ const ScrollJourney = () => {
         </motion.div>
 
         {/* ─── BEAT 3: The Garden Awaits ─── */}
-        <motion.div style={{ opacity: ga_to, y: ga_ty, zIndex: 20, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
+        <motion.div style={{ opacity: ga_to, y: ga_ty, zIndex: 23, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
           <div className="relative">
             <ProgressiveHeading
               words={["The", "Garden"]}
@@ -662,26 +1322,24 @@ const ScrollJourney = () => {
         </motion.div>
 
         {/* ─── BEAT 4: Coming Soon + Waitlist ─── */}
-        <motion.div style={{ opacity: cs_to, y: cs_ty, zIndex: 21, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
+        <motion.div style={{ opacity: cs_to, y: cs_ty, zIndex: 23, ...GPU }} className="absolute inset-0 flex items-center justify-center text-center px-6">
           <div className="max-w-xl w-full">
-            {/* Morphing monogram */}
             <MorphingMonogram progress={p} />
 
-            {/* FIX 7: Divider line visible */}
             <div className="w-16 h-[1px] mx-auto mb-8" style={{ background: "hsl(var(--gold) / 0.65)" }} />
 
-            {/* FIX 5: Coming Soon eyebrow */}
+            {/* TASK 2 applied: Coming Soon eyebrow */}
             <p
               className="font-body text-[11px] max-md:text-[9px] tracking-[0.65em] max-md:tracking-[0.4em] font-light uppercase mb-5"
               style={{
                 color: "hsl(var(--gold))",
-                textShadow: "0 0 40px rgba(0,0,0,0.9), 0 2px 8px rgba(0,0,0,1)",
+                textShadow: BODY_SHADOW,
               }}
             >
               Coming Soon
             </p>
 
-            {/* FIX 8: Glint word reveal for Something Beautiful */}
+            {/* Glint word reveal */}
             <div
               className="font-display font-extralight leading-[0.90]"
               style={{
@@ -706,88 +1364,100 @@ const ScrollJourney = () => {
               />
             </div>
 
-            {/* FIX 6: Body text */}
+            {/* Body text */}
             <p
               className="font-body text-[15px] max-md:text-[13px] font-light tracking-[0.05em] leading-[1.8] max-w-[420px] mx-auto mb-8"
               style={{
                 color: "hsl(var(--cream) / 0.88)",
-                textShadow: "0 0 30px rgba(0,0,0,0.85), 0 2px 6px rgba(0,0,0,0.95)",
+                textShadow: BODY_SHADOW,
               }}
             >
               Our botanical wellness collection is being crafted with care.
             </p>
 
-            {/* FIX 2 + FIX 3: Waitlist signup */}
+            {/* TASK 3: Waitlist form with frosted container */}
             <AnimatePresence mode="wait">
               {!submitted ? (
                 <motion.div
                   key="form"
                   initial={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.94, transition: { duration: 0.35, ease: "easeIn" } }}
-                  className="mt-2 flex flex-row max-md:flex-col items-center justify-center gap-5 max-md:gap-4 max-w-md mx-auto"
+                  className="mt-2"
                 >
-                  {/* FIX 3: Email input */}
-                  <input
-                    id="waitlist-email"
-                    type="email"
-                    required
-                    placeholder="your@email.com"
-                    className="font-body font-light text-[14px] tracking-[0.08em] text-center transition-all duration-300 ease-out focus:outline-none w-[280px] max-md:w-full"
+                  {/* Frosted glass container */}
+                  <div
+                    className="mx-auto max-w-md"
                     style={{
-                      color: "hsl(var(--cream) / 0.95)",
-                      background: "rgba(255,255,255,0.06)",
-                      border: "none",
-                      borderBottom: "1px solid hsl(var(--gold) / 0.5)",
-                      borderRadius: 0,
-                      padding: "12px 16px",
-                    }}
-                    onFocus={(e) => {
-                      e.target.style.borderBottom = "2px solid hsl(var(--gold))";
-                      e.target.style.background = "rgba(255,255,255,0.09)";
-                      e.target.style.boxShadow = "0 4px 20px rgba(212,175,55,0.18)";
-                    }}
-                    onBlur={(e) => {
-                      e.target.style.borderBottom = "1px solid hsl(var(--gold) / 0.5)";
-                      e.target.style.background = "rgba(255,255,255,0.06)";
-                      e.target.style.boxShadow = "none";
-                    }}
-                  />
-
-                  {/* FIX 2: Luxury outline button */}
-                  <button
-                    ref={waitlistBtnRef}
-                    onClick={handleSubmit}
-                    data-cursor="expand"
-                    className="font-body font-light text-[10px] tracking-[0.4em] uppercase whitespace-nowrap transition-all duration-300 max-md:w-full"
-                    style={{
-                      color: "hsl(var(--gold) / 0.9)",
-                      background: "transparent",
-                      border: "1px solid hsl(var(--gold) / 0.7)",
-                      borderRadius: "2px",
-                      padding: "16px 44px",
-                      letterSpacing: "0.4em",
-                    }}
-                    onMouseEnter={(e) => {
-                      const t = e.currentTarget;
-                      t.style.borderColor = "hsl(var(--gold))";
-                      t.style.background = "rgba(212,175,55,0.08)";
-                      t.style.letterSpacing = "0.46em";
-                      t.style.transform = "translateY(-2px)";
-                      t.style.boxShadow = "0 0 30px rgba(212,175,55,0.15), 0 4px 20px rgba(212,175,55,0.10)";
-                      t.style.transition = "all 400ms ease-out";
-                    }}
-                    onMouseLeave={(e) => {
-                      const t = e.currentTarget;
-                      t.style.borderColor = "hsl(var(--gold) / 0.7)";
-                      t.style.background = "transparent";
-                      t.style.letterSpacing = "0.4em";
-                      t.style.transform = "translateY(0)";
-                      t.style.boxShadow = "none";
-                      t.style.transition = "all 500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+                      background: "rgba(0,0,0,0.30)",
+                      backdropFilter: "blur(16px)",
+                      WebkitBackdropFilter: "blur(16px)",
+                      borderRadius: "4px",
+                      padding: "28px 32px",
+                      border: "1px solid rgba(212,175,55,0.20)",
                     }}
                   >
-                    Join the Waitlist
-                  </button>
+                    <div className="flex flex-row max-md:flex-col items-center justify-center gap-5 max-md:gap-4">
+                      <input
+                        id="waitlist-email"
+                        type="email"
+                        required
+                        placeholder="your@email.com"
+                        className="font-body font-light text-[14px] tracking-[0.1em] text-center transition-all duration-300 ease-out focus:outline-none w-[260px] max-md:w-full"
+                        style={{
+                          color: "hsl(var(--cream))",
+                          background: "rgba(10,8,5,0.55)",
+                          border: "1px solid rgba(212,175,55,0.6)",
+                          borderRadius: "2px",
+                          padding: "14px 20px",
+                        }}
+                        onFocus={(e) => {
+                          e.target.style.borderColor = "rgba(212,175,55,0.9)";
+                          e.target.style.background = "rgba(10,8,5,0.65)";
+                          e.target.style.boxShadow = "0 0 0 3px rgba(212,175,55,0.15), 0 4px 24px rgba(212,175,55,0.20)";
+                        }}
+                        onBlur={(e) => {
+                          e.target.style.borderColor = "rgba(212,175,55,0.6)";
+                          e.target.style.background = "rgba(10,8,5,0.55)";
+                          e.target.style.boxShadow = "none";
+                        }}
+                      />
+
+                      <button
+                        ref={waitlistBtnRef}
+                        onClick={handleSubmit}
+                        data-cursor="expand"
+                        className="font-body font-light text-[10px] tracking-[0.4em] uppercase whitespace-nowrap transition-all duration-300 max-md:w-full"
+                        style={{
+                          color: "hsl(var(--gold) / 0.9)",
+                          background: "transparent",
+                          border: "1px solid hsl(var(--gold) / 0.7)",
+                          borderRadius: "2px",
+                          padding: "16px 44px",
+                          letterSpacing: "0.4em",
+                        }}
+                        onMouseEnter={(e) => {
+                          const t = e.currentTarget;
+                          t.style.borderColor = "hsl(var(--gold))";
+                          t.style.background = "rgba(212,175,55,0.08)";
+                          t.style.letterSpacing = "0.46em";
+                          t.style.transform = "translateY(-2px)";
+                          t.style.boxShadow = "0 0 30px rgba(212,175,55,0.15), 0 4px 20px rgba(212,175,55,0.10)";
+                          t.style.transition = "all 400ms ease-out";
+                        }}
+                        onMouseLeave={(e) => {
+                          const t = e.currentTarget;
+                          t.style.borderColor = "hsl(var(--gold) / 0.7)";
+                          t.style.background = "transparent";
+                          t.style.letterSpacing = "0.4em";
+                          t.style.transform = "translateY(0)";
+                          t.style.boxShadow = "none";
+                          t.style.transition = "all 500ms cubic-bezier(0.34, 1.56, 0.64, 1)";
+                        }}
+                      >
+                        Join the Waitlist
+                      </button>
+                    </div>
+                  </div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -813,7 +1483,6 @@ const ScrollJourney = () => {
               )}
             </AnimatePresence>
 
-            {/* FIX 7: Divider line visible */}
             <div className="w-16 h-[1px] mx-auto mt-10" style={{ background: "hsl(var(--gold) / 0.65)" }} />
           </div>
         </motion.div>
@@ -828,24 +1497,28 @@ const ScrollJourney = () => {
           }} />
         </motion.div>
 
-        {/* Scroll hint */}
+        {/* TASK 10: Redesigned scroll hint */}
         <motion.div style={{ opacity: scrollHint, zIndex: 25 }} className="absolute bottom-12 left-1/2 -translate-x-1/2 scroll-hint-el">
-          <div className="flex flex-col items-center gap-3">
-            <p className="font-body text-[10px] max-md:text-[9px] tracking-[0.3em] font-light uppercase" style={{ color: "hsl(var(--gold))", textShadow: BODY_SHADOW }}>
+          <div className="flex flex-col items-center gap-2">
+            <p
+              className="font-body text-[9px] tracking-[0.5em] font-light uppercase"
+              style={{ color: "hsl(var(--cream) / 0.30)" }}
+            >
               Scroll
             </p>
-            <div className="w-[1px] h-10 relative overflow-hidden" style={{ background: "hsl(var(--cream) / 0.15)" }}>
-              <motion.div
-                className="absolute top-0 left-0 w-full"
-                style={{ background: "hsl(var(--cream) / 0.4)" }}
-                animate={{ height: ["0%", "100%"] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              />
-            </div>
+            <svg width="8" height="14" viewBox="0 0 8 14" fill="none" className="scroll-seed">
+              <path d="M4 0 Q8 4 4 14 Q0 4 4 0Z" fill="hsl(var(--gold) / 0.4)" />
+            </svg>
+            <div className="w-[1px] h-10" style={{
+              background: "linear-gradient(to bottom, hsl(var(--gold) / 0.45), transparent)",
+            }} />
           </div>
         </motion.div>
 
-        {/* FIX 9: Progress line at bottom */}
+        {/* TASK 10: Seed rotation animation */}
+        <SeedRotation />
+
+        {/* Progress line at bottom */}
         <motion.div
           style={{ scaleX: p, opacity: progressOpacity, zIndex: 60 }}
           className="absolute bottom-0 left-0 right-0 h-[2px] origin-left"
@@ -857,6 +1530,25 @@ const ScrollJourney = () => {
       </div>
     </section>
   );
+};
+
+/* ─── Seed rotation animation (TASK 10) ─── */
+const SeedRotation = () => {
+  useEffect(() => {
+    const seed = document.querySelector(".scroll-seed");
+    if (!seed) return;
+    const tween = gsap.to(seed, {
+      rotation: 10,
+      duration: 3,
+      ease: "sine.inOut",
+      yoyo: true,
+      repeat: -1,
+    });
+    // Also animate from -10
+    gsap.set(seed, { rotation: -10 });
+    return () => tween.kill();
+  }, []);
+  return null;
 };
 
 export default ScrollJourney;
