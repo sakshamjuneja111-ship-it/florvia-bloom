@@ -1537,12 +1537,18 @@ const SeedRotation = () => {
   useEffect(() => {
     const seed = document.querySelector(".scroll-seed");
     if (!seed) return;
+    gsap.set(seed, { rotation: -10 });
     const tween = gsap.to(seed, {
       rotation: 10,
       duration: 3,
       ease: "sine.inOut",
       yoyo: true,
       repeat: -1,
+    });
+    return () => { tween.kill(); };
+  }, []);
+  return null;
+};
     });
     // Also animate from -10
     gsap.set(seed, { rotation: -10 });
