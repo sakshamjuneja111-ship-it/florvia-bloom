@@ -1548,8 +1548,6 @@ const SeedRotation = () => {
     return () => { tween.kill(); };
   }, []);
   return null;
-
-
-export default ScrollJourney;
+};
 
 export default ScrollJourney;
