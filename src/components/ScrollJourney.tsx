@@ -1548,13 +1548,8 @@ const SeedRotation = () => {
     return () => { tween.kill(); };
   }, []);
   return null;
-};
-    });
-    // Also animate from -10
-    gsap.set(seed, { rotation: -10 });
-    return () => tween.kill();
-  }, []);
-  return null;
-};
+
+
+export default ScrollJourney;
 
 export default ScrollJourney;
